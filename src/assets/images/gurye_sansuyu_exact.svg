@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675">
+  <defs>
+    <!-- Sky gradient -->
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#6ba4dc"/>
+      <stop offset="45%" stop-color="#9dc6f0"/>
+      <stop offset="100%" stop-color="#e3f0fd"/>
+    </linearGradient>
+
+    <!-- Mountain Gradients -->
+    <linearGradient id="mountainFar" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#546578"/>
+      <stop offset="100%" stop-color="#3b4b5e"/>
+    </linearGradient>
+
+    <linearGradient id="mountainNear" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3d5236"/>
+      <stop offset="100%" stop-color="#24361e"/>
+    </linearGradient>
+
+    <!-- River Water Gradient -->
+    <linearGradient id="riverGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#80b3e6"/>
+      <stop offset="40%" stop-color="#5593d1"/>
+      <stop offset="100%" stop-color="#346fa8"/>
+    </linearGradient>
+
+    <!-- Yellow Blossom Glow Filter -->
+    <filter id="blossomGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+
+    <!-- Soft Drop Shadow for Signboard -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="3" dy="5" stdDeviation="5" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- 1. Sky & Sun Atmosphere -->
+  <rect width="1200" height="675" fill="url(#skyGrad)"/>
+  
+  <!-- Soft Sunlight Glow top right -->
+  <circle cx="1050" cy="80" r="280" fill="#fffdf0" opacity="0.35"/>
+
+  <!-- Soft Spring Clouds -->
+  <path d="M 120 110 Q 180 70 250 100 Q 320 60 390 100 Q 430 120 410 150 Q 120 170 120 110 Z" fill="#ffffff" opacity="0.65"/>
+  <path d="M 680 80 Q 750 40 830 70 Q 910 30 980 70 Q 1020 100 990 130 Q 680 140 680 80 Z" fill="#ffffff" opacity="0.55"/>
+
+  <!-- 2. Background Jirisan Mountains -->
+  <path d="M 0 310 Q 180 190 420 240 Q 680 140 920 210 Q 1080 180 1200 230 L 1200 675 L 0 675 Z" fill="url(#mountainFar)" opacity="0.88"/>
+  <path d="M 0 365 Q 200 270 420 310 Q 640 210 860 280 Q 1040 250 1200 300 L 1200 675 L 0 675 Z" fill="url(#mountainNear)"/>
+
+  <!-- 3. Seosi River Stream (Right Side) -->
+  <path d="M 480 390 Q 640 410 740 470 Q 890 540 1200 590 L 1200 675 L 420 675 Z" fill="url(#riverGrad)"/>
+
+  <!-- River Boulders and Rocks -->
+  <ellipse cx="660" cy="470" rx="38" ry="19" fill="#6e665e"/>
+  <ellipse cx="730" cy="510" rx="48" ry="24" fill="#585048"/>
+  <ellipse cx="840" cy="550" rx="65" ry="28" fill="#5f574f"/>
+  <ellipse cx="980" cy="605" rx="85" ry="35" fill="#4d453d"/>
+  <ellipse cx="590" cy="440" rx="28" ry="14" fill="#7d756d"/>
+  <ellipse cx="1120" cy="640" rx="90" ry="30" fill="#453d35"/>
+
+  <!-- Water Ripples & Sun Reflections -->
+  <path d="M 580 450 Q 630 445 680 452 M 700 490 Q 780 485 860 495 M 800 560 Q 900 550 1000 565" stroke="#edf6ff" stroke-width="2.5" fill="none" opacity="0.8"/>
+
+  <!-- 4. Stone Wall Embankment (돌담 축대) -->
+  <path d="M 80 395 L 520 375 L 660 425 L 780 500 L 930 580 L 930 675 L 0 675 Z" fill="#857a71"/>
+  <!-- Stone Texture & Mortar Lines -->
+  <path d="M 80 395 Q 280 385 520 375 Q 660 425 780 500 L 930 580" stroke="#484039" stroke-width="7" fill="none"/>
+  <path d="M 80 425 Q 280 415 490 405 Q 630 455 740 530 L 880 610" stroke="#484039" stroke-width="3.5" stroke-dasharray="16,8" fill="none"/>
+  <path d="M 80 455 Q 280 445 460 435 Q 600 485 700 560 L 830 640" stroke="#484039" stroke-width="3.5" stroke-dasharray="22,10" fill="none"/>
+
+  <!-- 5. Massive Yellow Sansuyu Trees in Full Bloom (Midground) -->
+  <!-- Layer 1: Dark Warm Ochre Base -->
+  <circle cx="180" cy="315" r="115" fill="#c49008"/>
+  <circle cx="330" cy="295" r="135" fill="#b88300"/>
+  <circle cx="480" cy="285" r="125" fill="#c49008"/>
+  <circle cx="630" cy="335" r="105" fill="#b88300"/>
+  <circle cx="760" cy="400" r="95" fill="#c49008"/>
+
+  <!-- Layer 2: Bright Golden Yellow Clouds -->
+  <circle cx="160" cy="305" r="100" fill="#f2ba02"/>
+  <circle cx="220" cy="285" r="90" fill="#ffd700"/>
+  <circle cx="310" cy="275" r="115" fill="#f2ba02"/>
+  <circle cx="390" cy="265" r="100" fill="#ffd700"/>
+  <circle cx="460" cy="265" r="105" fill="#f2ba02"/>
+  <circle cx="540" cy="295" r="90" fill="#ffd700"/>
+  <circle cx="620" cy="315" r="85" fill="#f2ba02"/>
+  <circle cx="740" cy="385" r="80" fill="#ffd700"/>
+
+  <!-- Layer 3: Fluffy Top Highlights -->
+  <g filter="url(#blossomGlow)">
+    <circle cx="150" cy="290" r="75" fill="#ffe500"/>
+    <circle cx="210" cy="270" r="70" fill="#fff152"/>
+    <circle cx="300" cy="255" r="90" fill="#ffe500"/>
+    <circle cx="370" cy="245" r="80" fill="#fff152"/>
+    <circle cx="450" cy="245" r="85" fill="#ffe500"/>
+    <circle cx="520" cy="280" r="70" fill="#fff152"/>
+    <circle cx="600" cy="300" r="65" fill="#ffe500"/>
+    <circle cx="720" cy="370" r="60" fill="#fff152"/>
+  </g>
+
+  <!-- Flower Cluster Dots & Sparkles -->
+  <g fill="#ffffff" opacity="0.85">
+    <circle cx="130" cy="275" r="5"/><circle cx="190" cy="245" r="6"/><circle cx="260" cy="235" r="7"/>
+    <circle cx="330" cy="225" r="8"/><circle cx="410" cy="225" r="7"/><circle cx="490" cy="245" r="7"/>
+    <circle cx="570" cy="275" r="6"/><circle cx="660" cy="325" r="6"/><circle cx="730" cy="355" r="5"/>
+  </g>
+
+  <!-- 6. Walking Path & Tourists/Visitors strolling -->
+  <path d="M 60 385 Q 260 375 460 370 Q 580 405 700 475" stroke="#d6c7b2" stroke-width="26" fill="none"/>
+  
+  <!-- Tourists silhouettes with colorful coats -->
+  <!-- Person 1 (Red coat) -->
+  <circle cx="230" cy="360" r="4" fill="#222"/>
+  <path d="M 230 364 L 230 375" stroke="#e63946" stroke-width="5"/>
+  <!-- Person 2 (Navy jacket) -->
+  <circle cx="242" cy="361" r="4" fill="#222"/>
+  <path d="M 242 365 L 242 376" stroke="#1d3557" stroke-width="5"/>
+  <!-- Person 3 (Yellow jacket) -->
+  <circle cx="360" cy="357" r="4" fill="#222"/>
+  <path d="M 360 361 L 360 372" stroke="#f77f00" stroke-width="5"/>
+  <!-- Person 4 (White coat) -->
+  <circle cx="372" cy="358" r="4" fill="#222"/>
+  <path d="M 372 362 L 372 373" stroke="#f1faee" stroke-width="5"/>
+  <!-- Group walking down -->
+  <circle cx="500" cy="380" r="3.5" fill="#222"/>
+  <path d="M 500 3835 L 500 392" stroke="#e63946" stroke-width="4"/>
+  <circle cx="510" cy="381" r="3.5" fill="#222"/>
+  <path d="M 510 384 L 510 393" stroke="#2a9d8f" stroke-width="4"/>
+
+  <!-- 7. Left Side: Traditional Wooden Structure & Signboard (The Exact Element in User Photo) -->
+  <g filter="url(#shadow)">
+    <!-- Main Dark Wooden Support Posts -->
+    <rect x="15" y="200" width="170" height="320" fill="#2b1a13" rx="4"/>
+    <rect x="22" y="206" width="156" height="308" fill="#3d271d" rx="3"/>
+    
+    <!-- Traditional Tile Roof Structure Top -->
+    <path d="M 5 200 Q 100 178 195 200 L 185 218 Q 100 200 15 218 Z" fill="#141414"/>
+    <path d="M 10 203 Q 100 184 190 203" stroke="#c5a059" stroke-width="3" fill="none"/>
+
+    <!-- Large Yellow Vertical Signboard (HIGH VISIBILITY) -->
+    <rect x="35" y="235" width="130" height="250" fill="#ffcc00" stroke="#996600" stroke-width="4.5" rx="10"/>
+    <rect x="42" y="242" width="116" height="236" fill="#ffe600" rx="7"/>
+
+    <!-- Exact Sign Text in Bold Display Typography: 구례 / 산수유 / 꽃축제 -->
+    <text x="100" y="295" font-family="'Pretendard', 'Noto Sans KR', 'Malgun Gothic', 'Arial', sans-serif" font-weight="900" font-size="36" fill="#111111" text-anchor="middle" letter-spacing="-1">구례</text>
+    <text x="100" y="355" font-family="'Pretendard', 'Noto Sans KR', 'Malgun Gothic', 'Arial', sans-serif" font-weight="900" font-size="36" fill="#d50000" text-anchor="middle" letter-spacing="-1">산수유</text>
+    <text x="100" y="415" font-family="'Pretendard', 'Noto Sans KR', 'Malgun Gothic', 'Arial', sans-serif" font-weight="900" font-size="36" fill="#111111" text-anchor="middle" letter-spacing="-1">꽃축제</text>
+    
+    <!-- Flower Icon on Signboard -->
+    <circle cx="100" cy="452" r="11" fill="#e65100"/>
+    <circle cx="100" cy="452" r="5" fill="#ffff00"/>
+
+    <!-- Red Wooden Handrail in Foreground Left -->
+    <rect x="0" y="500" width="230" height="22" fill="#b71c1c"/>
+    <rect x="25" y="522" width="16" height="153" fill="#7b0000"/>
+    <rect x="110" y="522" width="16" height="153" fill="#7b0000"/>
+    <rect x="195" y="522" width="16" height="153" fill="#7b0000"/>
+    <rect x="0" y="580" width="230" height="16" fill="#c62828"/>
+  </g>
+
+  <!-- 8. Foreground Framing: Bright Yellow Sansuyu Branches (Bottom Left & Right) -->
+  <!-- Bottom Left framing branches -->
+  <path d="M 0 675 C 60 590 140 570 220 610" stroke="#3d271d" stroke-width="7" fill="none"/>
+  <circle cx="130" cy="580" r="28" fill="#ffe600" opacity="0.96"/>
+  <circle cx="165" cy="600" r="34" fill="#ffd700" opacity="0.96"/>
+  <circle cx="200" cy="620" r="25" fill="#fff152" opacity="0.96"/>
+
+  <!-- Bottom Right framing branches -->
+  <path d="M 1200 675 C 1090 570 980 550 880 590" stroke="#3d271d" stroke-width="8" fill="none"/>
+  <circle cx="1040" cy="560" r="38" fill="#ffe600" opacity="0.96"/>
+  <circle cx="960" cy="570" r="42" fill="#ffd700" opacity="0.96"/>
+  <circle cx="900" cy="590" r="32" fill="#fff152" opacity="0.96"/>
+  <circle cx="1110" cy="540" r="30" fill="#ffe600" opacity="0.96"/>
+</svg>

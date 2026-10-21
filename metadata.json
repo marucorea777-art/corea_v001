@@ -1,0 +1,6 @@
+{
+  "name": "대한민국 연구소| Corea Labs",
+  "description": "An immersive, beautifully crafted interactive showcase of South Korea's rich heritage, living culture, curated destinations, and vibrant seasonal festivals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
