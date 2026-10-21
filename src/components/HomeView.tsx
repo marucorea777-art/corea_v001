@@ -339,10 +339,24 @@ export default function HomeView({ setActiveTab }: HomeViewProps) {
             <div className="space-y-1">
               <span className="text-[9px] font-mono text-teal-600 font-bold uppercase tracking-wider"><Translate>Destination Highlight</Translate></span>
               <h4 className="text-base font-display font-bold text-stone-900 flex items-center gap-1.5">
-                {highlightPlace.name} <span className="text-xs font-sans text-stone-400 font-normal">({highlightPlace.koreanName})</span>
+                {language === "ko" ? (
+                  <>
+                    <span>{highlightPlace.koreanName || highlightPlace.name}</span>
+                    {highlightPlace.name && highlightPlace.name !== highlightPlace.koreanName && (
+                      <span className="text-xs font-sans text-stone-400 font-normal">({highlightPlace.name})</span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <span><Translate>{highlightPlace.name}</Translate></span>
+                    {highlightPlace.koreanName && (
+                      <span className="text-xs font-sans text-stone-400 font-normal">({highlightPlace.koreanName})</span>
+                    )}
+                  </>
+                )}
               </h4>
               <p className="text-xs text-stone-500 line-clamp-3 leading-relaxed">
-                {highlightPlace.description}
+                <Translate>{highlightPlace.description}</Translate>
               </p>
             </div>
             <button
@@ -372,10 +386,24 @@ export default function HomeView({ setActiveTab }: HomeViewProps) {
             <div className="space-y-1">
               <span className="text-[9px] font-mono text-amber-600 font-bold uppercase tracking-wider"><Translate>Festival Highlight</Translate></span>
               <h4 className="text-base font-display font-bold text-stone-900 flex items-center gap-1.5">
-                {highlightFestival.name} <span className="text-xs font-sans text-stone-400 font-normal">({highlightFestival.koreanName})</span>
+                {language === "ko" ? (
+                  <>
+                    <span>{highlightFestival.koreanName || highlightFestival.name}</span>
+                    {highlightFestival.name && highlightFestival.name !== highlightFestival.koreanName && (
+                      <span className="text-xs font-sans text-stone-400 font-normal">({highlightFestival.name})</span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <span><Translate>{highlightFestival.name}</Translate></span>
+                    {highlightFestival.koreanName && (
+                      <span className="text-xs font-sans text-stone-400 font-normal">({highlightFestival.koreanName})</span>
+                    )}
+                  </>
+                )}
               </h4>
               <p className="text-xs text-stone-500 line-clamp-3 leading-relaxed">
-                {highlightFestival.description}
+                <Translate>{highlightFestival.description}</Translate>
               </p>
             </div>
             <button

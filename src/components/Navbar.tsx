@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Compass, BookOpen, Utensils, MapPin, CalendarDays, PlaneLanding, ChevronDown } from "lucide-react";
+import { Compass, BookOpen, Utensils, MapPin, CalendarDays, PlaneLanding, ChevronDown, ShieldCheck, LogOut } from "lucide-react";
 import { motion } from "motion/react";
-import { useTranslation, LANGUAGES, LanguageCode } from "../context/LanguageContext";
+import { useTranslation, LANGUAGES, LanguageCode, Translate } from "../context/LanguageContext";
+import { useAdmin } from "../context/AdminContext";
 import KoreaLogoIcon from "./KoreaLogoIcon";
 
 interface NavbarProps {
@@ -11,10 +12,11 @@ interface NavbarProps {
 
 export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
   const { language, setLanguage, t } = useTranslation();
+  const { isAdmin, logout, setShowLoginModal } = useAdmin();
   const [langOpen, setLangOpen] = useState(false);
 
   const navItems = [
-    { id: "home", label: "Core", icon: Compass },
+    { id: "home", label: "Corea", icon: Compass },
     { id: "heritage", label: "Heritage", icon: BookOpen },
     { id: "culture", label: "Culture", icon: Utensils },
     { id: "places", label: "Places", icon: MapPin },
@@ -107,6 +109,30 @@ export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
               )}
             </div>
 
+            {/* Admin Access Indicator & Button */}
+            {isAdmin ? (
+              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-900 px-3 py-1.5 rounded-full text-xs font-medium shadow-2xs">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                <span className="font-semibold text-[11px]"><Translate>관리자</Translate></span>
+                <button
+                  onClick={logout}
+                  title="관리자 로그아웃"
+                  className="ml-1 text-stone-400 hover:text-red-600 transition-colors cursor-pointer"
+                >
+                  <LogOut className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowLoginModal(true)}
+                title="관리자 로그인 (명소/축제 관리)"
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200/80 bg-white hover:bg-stone-50 transition-colors text-xs font-medium text-stone-600 hover:text-stone-900 rounded-full cursor-pointer shadow-2xs"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-stone-400" />
+                <span className="text-[11px]"><Translate>관리자</Translate></span>
+              </button>
+            )}
+
             {/* Live Clock / Status */}
             <div className="flex items-center gap-2 text-stone-500 font-mono text-[10px] border border-stone-200 bg-stone-50 px-3 py-1.5 rounded-full shadow-2xs">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -116,7 +142,7 @@ export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
         </div>
       </header>
 
-      {/* Mobile Top Header with Language Selector */}
+      {/* Mobile Top Header with Language Selector & Admin Button */}
       <header className="fixed top-0 left-0 right-0 z-50 md:hidden bg-white/75 backdrop-blur-xl border-b border-stone-200/50 h-14 flex items-center justify-between px-4">
         <button 
           onClick={() => setActiveTab("home")}
@@ -126,16 +152,36 @@ export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
           <span className="font-display font-bold text-stone-900 tracking-tight text-xs">COREA LABS</span>
         </button>
         
-        {/* Mobile Language Selector Dropdown */}
-        <div className="relative">
-          <button 
-            onClick={() => setLangOpen(!langOpen)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 border border-stone-200 bg-white text-xs font-medium text-stone-700 rounded-full cursor-pointer shadow-2xs"
-          >
-            <span>{currentLangObj?.flag}</span>
-            <span className="text-[10px] font-semibold uppercase">{currentLangObj?.code}</span>
-            <ChevronDown className="w-3 h-3 text-stone-400" />
-          </button>
+        <div className="flex items-center gap-2">
+          {/* Mobile Admin Button */}
+          {isAdmin ? (
+            <button
+              onClick={() => setShowLoginModal(true)}
+              className="p-1.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 cursor-pointer"
+              title="관리자 모드 활성"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowLoginModal(true)}
+              className="p-1.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200 cursor-pointer"
+              title="관리자 로그인"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-stone-400" />
+            </button>
+          )}
+
+          {/* Mobile Language Selector Dropdown */}
+          <div className="relative">
+            <button 
+              onClick={() => setLangOpen(!langOpen)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 border border-stone-200 bg-white text-xs font-medium text-stone-700 rounded-full cursor-pointer shadow-2xs"
+            >
+              <span>{currentLangObj?.flag}</span>
+              <span className="text-[10px] font-semibold uppercase">{currentLangObj?.code}</span>
+              <ChevronDown className="w-3 h-3 text-stone-400" />
+            </button>
           
           {langOpen && (
             <>
@@ -161,6 +207,7 @@ export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
               </div>
             </>
           )}
+          </div>
         </div>
       </header>
 

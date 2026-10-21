@@ -1,8 +1,11 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Utensils, Sparkles, Wand2, RefreshCw, Landmark, Share2 } from "lucide-react";
+import { Utensils, Sparkles, Wand2, RefreshCw, Landmark, Share2, Trash2, Eye, Download, Check, ShieldCheck, Heart, Archive } from "lucide-react";
 import { CULTURE_CATEGORIES, CULTURE_ITEMS, HANGUL_CONCEPTS, CARD_STYLES } from "../data";
 import { useTranslatedData, useTranslation, Translate } from "../context/LanguageContext";
+import { useAdmin } from "../context/AdminContext";
+import { getPostcards, addPostcard, deletePostcard } from "../services/dataStorage";
+import { PostcardLog } from "../types";
 
 export default function CultureView() {
   const { language, t } = useTranslation();
@@ -28,18 +31,92 @@ export default function CultureView() {
   const selectedConcept = translatedConcepts[selectedConceptIndex] || HANGUL_CONCEPTS[0];
   const selectedStyle = translatedStyles[selectedStyleIndex] || CARD_STYLES[0];
 
+  const { isAdmin, adminToken, setShowLoginModal } = useAdmin();
+  const [postcards, setPostcards] = useState<PostcardLog[]>([]);
+  const [currentCardNumber, setCurrentCardNumber] = useState<number>(() => Math.floor(Math.random() * 90000) + 10000);
+  const [selectedModalCard, setSelectedModalCard] = useState<PostcardLog | null>(null);
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+
+  // Load saved postcards
+  useEffect(() => {
+    getPostcards().then((data) => {
+      if (Array.isArray(data)) {
+        setPostcards(data);
+      }
+    });
+  }, []);
+
   const handleGenerateCard = () => {
     setIsGenerating(true);
-    setTimeout(() => {
+    const newNum = Math.floor(Math.random() * 90000) + 10000;
+    setCurrentCardNumber(newNum);
+
+    setTimeout(async () => {
       setIsGenerating(false);
       setCardGenerated(true);
+
+      const targetRecipient = recipientName.trim() || t("To You") || "Dear Friend";
+      const targetMessage = customMessage.trim() || `Wishing you a life filled with '${selectedConcept.romanization}'—the deep connections that make our shared human experience beautiful.`;
+
+      // Automatically log the postcard
+      const saved = await addPostcard({
+        cardNumber: newNum,
+        recipientName: targetRecipient,
+        customMessage: targetMessage,
+        conceptHangul: selectedConcept.hangul,
+        conceptRomanization: selectedConcept.romanization,
+        conceptMeaning: selectedConcept.meaning,
+        styleId: selectedStyle.id,
+        styleName: selectedStyle.name,
+        bgGradient: selectedStyle.bgGradient,
+        textColor: selectedStyle.textColor,
+        fontStyle: selectedStyle.fontStyle,
+      });
+
+      setPostcards((prev) => [saved, ...prev.filter((c) => c.id !== saved.id)]);
+      setSaveToast(t("Postcard successfully archived in the log gallery!") || "새 엽서가 제작되어 기록소에 보관되었습니다!");
+      setTimeout(() => setSaveToast(null), 4000);
     }, 1200);
+  };
+
+  const handleManualSave = async () => {
+    const targetRecipient = recipientName.trim() || t("To You") || "Dear Friend";
+    const targetMessage = customMessage.trim() || `Wishing you a life filled with '${selectedConcept.romanization}'—the deep connections that make our shared human experience beautiful.`;
+
+    const saved = await addPostcard({
+      cardNumber: currentCardNumber,
+      recipientName: targetRecipient,
+      customMessage: targetMessage,
+      conceptHangul: selectedConcept.hangul,
+      conceptRomanization: selectedConcept.romanization,
+      conceptMeaning: selectedConcept.meaning,
+      styleId: selectedStyle.id,
+      styleName: selectedStyle.name,
+      bgGradient: selectedStyle.bgGradient,
+      textColor: selectedStyle.textColor,
+      fontStyle: selectedStyle.fontStyle,
+    });
+
+    setPostcards((prev) => [saved, ...prev.filter((c) => c.id !== saved.id)]);
+    setSaveToast(t("Saved to Postcard Archive!") || "엽서가 보관소에 안전하게 저장되었습니다!");
+    setTimeout(() => setSaveToast(null), 3000);
+  };
+
+  const handleDeletePostcard = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm("이 엽서 기록을 삭제하시겠습니까?")) return;
+    await deletePostcard(id, adminToken);
+    setPostcards((prev) => prev.filter((c) => c.id !== id));
+    if (selectedModalCard?.id === id) {
+      setSelectedModalCard(null);
+    }
   };
 
   const handleResetCard = () => {
     setCardGenerated(false);
     setRecipientName("");
     setCustomMessage("");
+    setCurrentCardNumber(Math.floor(Math.random() * 90000) + 10000);
   };
 
   return (
@@ -318,7 +395,7 @@ export default function CultureView() {
                     <div className="flex justify-between items-start">
                       <div className="space-y-0.5">
                         <span className="text-[10px] font-mono tracking-widest uppercase opacity-75">Corea Labs</span>
-                        <div className="text-[8px] font-mono opacity-60">No. {Math.floor(Math.random() * 90000) + 10000}</div>
+                        <div className="text-[8px] font-mono opacity-60">No. {currentCardNumber}</div>
                       </div>
                       
                       {/* Traditional Red Stamp (Do-jang) */}
@@ -369,16 +446,17 @@ export default function CultureView() {
                   {/* Actions under card */}
                   <div className="flex gap-2.5 mt-4 justify-center">
                     <button
-                      onClick={() => alert("Postcard saved! In a full-production environment, this triggers a PDF/Image render of your customized Hanji postcard.")}
-                      className="px-4 py-2 bg-stone-900 border border-stone-800 text-stone-200 text-xs font-medium rounded-lg hover:bg-stone-850 flex items-center gap-1.5 transition-colors cursor-pointer"
+                      onClick={handleManualSave}
+                      className="px-4 py-2 bg-stone-900 border border-stone-800 text-stone-200 text-xs font-medium rounded-lg hover:bg-stone-850 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                     >
-                      <Translate>Save Card</Translate>
+                      <Check className="w-3.5 h-3.5 text-amber-400" />
+                      <Translate>보관소에 재저장</Translate>
                     </button>
                     <button
                       onClick={handleResetCard}
                       className="px-4 py-2 bg-stone-800 text-stone-300 text-xs font-medium rounded-lg hover:bg-stone-700 transition-colors cursor-pointer"
                     >
-                      <Translate>Create Another</Translate>
+                      <Translate>새로 만들기</Translate>
                     </button>
                   </div>
                 </motion.div>
@@ -386,7 +464,241 @@ export default function CultureView() {
             </AnimatePresence>
           </div>
         </div>
+
+        {/* Save feedback toast */}
+        {saveToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="p-3.5 bg-stone-900 text-amber-400 border border-amber-400/30 rounded-2xl text-xs font-medium flex items-center justify-between shadow-xl max-w-md mx-auto"
+          >
+            <div className="flex items-center gap-2">
+              <Check className="w-4 h-4 text-emerald-400" />
+              <span>{saveToast}</span>
+            </div>
+            <button
+              onClick={() => setSaveToast(null)}
+              className="text-stone-400 hover:text-white text-xs px-2 cursor-pointer"
+            >
+              ✕
+            </button>
+          </motion.div>
+        )}
       </section>
+
+      {/* Postcard Archive & Log Gallery */}
+      <section className="space-y-6 pt-4 border-t border-stone-200/70">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-200 px-2.5 py-0.5 rounded-full text-[11px] font-mono uppercase tracking-wider">
+              <Archive className="w-3 h-3 text-amber-600" />
+              <Translate>제작된 한지 엽서 기록소</Translate>
+            </div>
+            <h3 className="text-xl md:text-2xl font-display font-bold text-stone-900 tracking-tight">
+              <Translate>엽서 아카이브 & 제작 로그</Translate>
+            </h3>
+            <p className="text-xs text-stone-500 font-sans">
+              <Translate>이곳 연구실에서 방문객들이 제작한 전통 철학 한지 엽서 기록입니다.</Translate>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-mono font-medium bg-stone-100 text-stone-700 border border-stone-200 px-3 py-1.5 rounded-full">
+              <Translate>총</Translate> {postcards.length}<Translate>장의 엽서 보관됨</Translate>
+            </span>
+            {!isAdmin ? (
+              <button
+                onClick={() => setShowLoginModal(true)}
+                className="text-xs font-medium text-stone-500 hover:text-stone-900 flex items-center gap-1 px-3 py-1.5 rounded-full border border-dashed border-stone-300 hover:border-stone-400 transition-colors cursor-pointer"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span><Translate>관리자 로그인</Translate></span>
+              </button>
+            ) : (
+              <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                <span><Translate>관리자 권한: 삭제 가능</Translate></span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Postcards Grid */}
+        {postcards.length === 0 ? (
+          <div className="p-12 text-center rounded-3xl bg-white border border-stone-200/80 space-y-3">
+            <Landmark className="w-10 h-10 text-stone-300 mx-auto" />
+            <h4 className="font-display font-semibold text-stone-700 text-sm">
+              <Translate>아직 보관된 엽서가 없습니다</Translate>
+            </h4>
+            <p className="text-xs text-stone-400 max-w-sm mx-auto">
+              <Translate>위의 캘리그래피 제작기에서 엽서를 생성하면 이곳 기록소에 자동으로 영구 보관됩니다.</Translate>
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {postcards.map((card) => (
+              <motion.div
+                key={card.id}
+                layout
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="group bg-white rounded-2xl border border-stone-200/80 shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col justify-between"
+              >
+                {/* Mini Card Preview Header */}
+                <div className={`p-4 bg-gradient-to-b ${card.bgGradient} ${card.textColor} relative aspect-[16/10] flex flex-col justify-between border-b border-stone-100`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[9px] font-mono tracking-wider opacity-75">COREA LABS</span>
+                      <div className="text-[8px] font-mono opacity-60">No. {card.cardNumber}</div>
+                    </div>
+                    {/* Stamp */}
+                    <div className="w-5 h-5 bg-red-600 rounded-xs border border-red-700 flex items-center justify-center text-white text-[8px] font-display font-extrabold rotate-[-5deg] shadow-xs">
+                      <span>국가</span>
+                    </div>
+                  </div>
+
+                  {/* Big Hangul Calligraphy */}
+                  <div className="text-center my-auto">
+                    <span className={`text-4xl md:text-5xl font-bold tracking-normal ${card.fontStyle}`}>
+                      {card.conceptHangul}
+                    </span>
+                    <div className="text-[10px] font-mono uppercase tracking-widest mt-0.5 opacity-90">
+                      {card.conceptRomanization}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-end text-[9px] font-sans opacity-80">
+                    <span className="truncate max-w-[140px] font-medium">To: {card.recipientName}</span>
+                    <span className="text-[8px] font-mono opacity-60">
+                      {new Date(card.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card Details & Actions */}
+                <div className="p-4 space-y-3 flex-grow flex flex-col justify-between">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-stone-900">{card.recipientName}</span>
+                      <span className="text-[10px] font-mono text-stone-400 bg-stone-100 px-2 py-0.5 rounded-md">
+                        {card.styleName}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-stone-600 italic line-clamp-2 font-sans">
+                      "{card.customMessage}"
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => setSelectedModalCard(card)}
+                      className="flex-1 py-1.5 px-3 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span><Translate>엽서 크게보기</Translate></span>
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={(e) => handleDeletePostcard(card.id, e)}
+                        title="엽서 삭제 (관리자)"
+                        className="p-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Full Postcard Modal */}
+      <AnimatePresence>
+        {selectedModalCard && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.92 }}
+              className="bg-white rounded-3xl shadow-2xl border border-stone-200 max-w-sm w-full overflow-hidden p-6 space-y-5"
+            >
+              {/* Full Card */}
+              <div
+                className={`rounded-2xl p-6 bg-gradient-to-b ${selectedModalCard.bgGradient} ${selectedModalCard.textColor} shadow-2xl relative aspect-[3/4] flex flex-col justify-between border border-white/10`}
+              >
+                <div className="flex justify-between items-start">
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-mono tracking-widest uppercase opacity-75">Corea Labs</span>
+                    <div className="text-[8px] font-mono opacity-60">No. {selectedModalCard.cardNumber}</div>
+                  </div>
+                  <div className="w-7 h-7 bg-red-600 rounded-sm border border-red-700 flex items-center justify-center text-white text-[10px] font-display font-extrabold tracking-tighter leading-none shadow-xs rotate-[-6deg]">
+                    <span className="rotate-[6deg]">한국<br/>국가</span>
+                  </div>
+                </div>
+
+                <div className="text-center py-4 space-y-2">
+                  <h1 className={`text-6xl md:text-7xl font-bold tracking-normal ${selectedModalCard.fontStyle}`}>
+                    {selectedModalCard.conceptHangul}
+                  </h1>
+                  <div className="space-y-1">
+                    <div className="text-sm font-mono tracking-widest font-semibold uppercase opacity-90">
+                      {selectedModalCard.conceptRomanization}
+                    </div>
+                    <div className="text-[10px] font-sans opacity-75 max-w-[200px] mx-auto leading-normal">
+                      {selectedModalCard.conceptMeaning}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-4 border-t border-current/10 font-sans">
+                  <div className="text-xs font-semibold tracking-tight">
+                    {selectedModalCard.recipientName}
+                  </div>
+                  <p className="text-[11px] leading-relaxed italic opacity-85 font-light">
+                    {selectedModalCard.customMessage}
+                  </p>
+                  <div className="flex justify-between items-center text-[9px] font-mono opacity-60 pt-1">
+                    <span>{new Date(selectedModalCard.createdAt).toLocaleString()}</span>
+                    <span>Seoul Sky</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `[Corea Labs Postcard #${selectedModalCard.cardNumber}]\nTo: ${selectedModalCard.recipientName}\nConcept: ${selectedModalCard.conceptHangul} (${selectedModalCard.conceptRomanization})\nMessage: ${selectedModalCard.customMessage}`
+                    );
+                    alert("엽서 내용이 클립보드에 복사되었습니다!");
+                  }}
+                  className="flex-1 py-2.5 bg-stone-900 text-white rounded-xl text-xs font-semibold hover:bg-stone-800 transition-colors cursor-pointer"
+                >
+                  <Translate>텍스트 복사</Translate>
+                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDeletePostcard(selectedModalCard.id)}
+                    className="py-2.5 px-3 border border-red-200 text-red-600 rounded-xl text-xs font-medium hover:bg-red-50 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedModalCard(null)}
+                  className="py-2.5 px-4 bg-stone-100 text-stone-700 rounded-xl text-xs font-semibold hover:bg-stone-200 transition-colors cursor-pointer"
+                >
+                  <Translate>닫기</Translate>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

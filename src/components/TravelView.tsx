@@ -222,7 +222,9 @@ export default function TravelView() {
                     <Globe className="w-5 h-5 text-amber-600" />
                     <Translate>비자 발급 및 K-ETA 가이드</Translate>
                   </h2>
-                  <p className="text-xs text-stone-500 font-mono tracking-tight mt-1">Visa Application & K-ETA (Korea Electronic Travel Authorization)</p>
+                  <p className="text-xs text-stone-500 font-mono tracking-tight mt-1">
+                    <Translate>Visa Application & K-ETA (Korea Electronic Travel Authorization)</Translate>
+                  </p>
                 </div>
 
                 <div className="space-y-6 text-sm text-stone-600 leading-relaxed font-sans">
@@ -295,7 +297,9 @@ export default function TravelView() {
                     <PlaneLanding className="w-5 h-5 text-amber-600" />
                     <Translate>안전하고 신속한 입국 절차</Translate>
                   </h2>
-                  <p className="text-xs text-stone-500 font-mono tracking-tight mt-1">Arrival Step-by-Step Guide & Customs Policy</p>
+                  <p className="text-xs text-stone-500 font-mono tracking-tight mt-1">
+                    <Translate>Arrival Step-by-Step Guide & Customs Policy</Translate>
+                  </p>
                 </div>
 
                 <div className="space-y-6 text-sm text-stone-600 leading-relaxed font-sans">
@@ -368,7 +372,9 @@ export default function TravelView() {
                     <Coins className="w-5 h-5 text-amber-600" />
                     <Translate>현명한 환전 기법과 대중교통 선불카드</Translate>
                   </h2>
-                  <p className="text-xs text-stone-500 font-mono tracking-tight mt-1">Currency Exchange Tips & Smart Payment cards in Korea</p>
+                  <p className="text-xs text-stone-500 font-mono tracking-tight mt-1">
+                    <Translate>Currency Exchange Tips & Smart Payment cards in Korea</Translate>
+                  </p>
                 </div>
 
                 <div className="space-y-6 text-sm text-stone-600 leading-relaxed font-sans">

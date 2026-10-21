@@ -70,6 +70,8 @@ export interface Destination {
     hiddenGem: string;
   };
   attractions: Attraction[];
+  isCustom?: boolean;
+  region?: string;
 }
 
 export interface Festival {
@@ -77,8 +79,8 @@ export interface Festival {
   name: string;
   koreanName: string;
   season: "Spring" | "Summer" | "Autumn" | "Winter";
-  region?: "Seoul/Capital" | "Gangwon" | "Chungcheong" | "Jeolla" | "Gyeongsang" | "Jeju";
-  category?: "Flower & Nature" | "Traditional & Culture" | "Food & Gourmet" | "Night & Lights" | "Music & Arts" | "Winter & Ice";
+  region?: "Seoul/Capital" | "Gangwon" | "Chungcheong" | "Jeolla" | "Gyeongsang" | "Jeju" | string;
+  category?: "Flower & Nature" | "Traditional & Culture" | "Food & Gourmet" | "Night & Lights" | "Music & Arts" | "Winter & Ice" | string;
   location: string;
   dateRange: string;
   description: string;
@@ -86,6 +88,7 @@ export interface Festival {
   highlight: string;
   features: string[];
   month: number; // 1-12
+  isCustom?: boolean;
 }
 
 export interface HangulConcept {
@@ -102,5 +105,21 @@ export interface CardStyle {
   textColor: string;
   accentColor: string;
   bgImage?: string;
+  fontStyle: string;
+}
+
+export interface PostcardLog {
+  id: string;
+  createdAt: string; // ISO string
+  cardNumber: number;
+  recipientName: string;
+  customMessage: string;
+  conceptHangul: string;
+  conceptRomanization: string;
+  conceptMeaning: string;
+  styleId: string;
+  styleName: string;
+  bgGradient: string;
+  textColor: string;
   fontStyle: string;
 }

@@ -8,10 +8,13 @@ import PlacesView from "./components/PlacesView";
 import FestivalsView from "./components/FestivalsView";
 import TravelView from "./components/TravelView";
 import { LanguageProvider, Translate } from "./context/LanguageContext";
+import { AdminProvider, useAdmin } from "./context/AdminContext";
+import AdminLoginModal from "./components/AdminLoginModal";
 import KoreaLogoIcon from "./components/KoreaLogoIcon";
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState<string>("home");
+  const { isAdmin, setShowLoginModal, logout } = useAdmin();
 
   const handleSetTab = (tab: string) => {
     startTransition(() => {
@@ -76,18 +79,37 @@ function MainApp() {
             © {new Date().getFullYear()} Corea Labs. <Translate>Crafted with love for South Korea's Eternal Cultural Heritage.</Translate>
           </div>
 
-          {/* Quick tab jumper links */}
-          <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center font-medium">
-            <button onClick={() => handleSetTab("home")} className="hover:text-stone-900 transition-colors cursor-pointer"><Translate>Core</Translate></button>
+          {/* Quick tab jumper links & Admin portal trigger */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 justify-center font-medium">
+            <button onClick={() => handleSetTab("home")} className="hover:text-stone-900 transition-colors cursor-pointer"><Translate>Corea</Translate></button>
             <button onClick={() => handleSetTab("heritage")} className="hover:text-stone-900 transition-colors cursor-pointer"><Translate>Heritage</Translate></button>
             <button onClick={() => handleSetTab("culture")} className="hover:text-stone-900 transition-colors cursor-pointer"><Translate>Culture</Translate></button>
             <button onClick={() => handleSetTab("places")} className="hover:text-stone-900 transition-colors cursor-pointer"><Translate>Places</Translate></button>
             <button onClick={() => handleSetTab("festivals")} className="hover:text-stone-900 transition-colors cursor-pointer"><Translate>Festivals</Translate></button>
             <button onClick={() => handleSetTab("travel")} className="hover:text-stone-900 transition-colors cursor-pointer"><Translate>Guide</Translate></button>
+            <span className="text-stone-300">|</span>
+            {isAdmin ? (
+              <button 
+                onClick={logout} 
+                className="text-amber-700 hover:text-red-600 transition-colors cursor-pointer font-semibold"
+              >
+                <Translate>관리자 로그아웃</Translate>
+              </button>
+            ) : (
+              <button 
+                onClick={() => setShowLoginModal(true)} 
+                className="text-stone-400 hover:text-stone-800 transition-colors cursor-pointer font-normal"
+              >
+                <Translate>관리자 로그인</Translate>
+              </button>
+            )}
           </div>
 
         </div>
       </footer>
+
+      {/* Global Admin Login Modal */}
+      <AdminLoginModal />
     </div>
   );
 }
@@ -95,7 +117,9 @@ function MainApp() {
 export default function App() {
   return (
     <LanguageProvider>
-      <MainApp />
+      <AdminProvider>
+        <MainApp />
+      </AdminProvider>
     </LanguageProvider>
   );
 }

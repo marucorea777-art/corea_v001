@@ -1,13 +1,120 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, FormEvent } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { MapPin, Compass, Landmark, Star, ChevronRight, Ticket } from "lucide-react";
+import { 
+  MapPin, 
+  Compass, 
+  Landmark, 
+  Star, 
+  ChevronRight, 
+  Ticket, 
+  Plus, 
+  Trash2, 
+  X, 
+  ShieldCheck, 
+  Image as ImageIcon, 
+  Check, 
+  Coffee, 
+  Sunrise, 
+  AlertCircle 
+} from "lucide-react";
 import { DESTINATIONS } from "../data";
+import { Destination } from "../types";
 import { useTranslatedData, useTranslation, Translate } from "../context/LanguageContext";
+import { useAdmin } from "../context/AdminContext";
+import { 
+  getCustomDestinations, 
+  getDeletedDestinationIds, 
+  addDestination, 
+  deleteDestination 
+} from "../services/dataStorage";
+import ImageUploader, { ImagePreset } from "./ImageUploader";
+
+// Curated high-resolution photorealistic image presets for Korea destinations (compliant with AGENTS.md real-photo rule)
+const REAL_PHOTO_PRESETS: ImagePreset[] = [
+  {
+    label: "Jeonju Hanok Village",
+    koreanLabel: "전주 한옥마을",
+    url: "https://images.unsplash.com/photo-1578637387939-43c525550085?q=80&w=1200&auto=format&fit=crop",
+  },
+  {
+    label: "Gangneung Coastline",
+    koreanLabel: "강릉 안목해변",
+    url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1200&auto=format&fit=crop",
+  },
+  {
+    label: "Damyang Juknokwon",
+    koreanLabel: "담양 죽녹원 대나무숲",
+    url: "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?q=80&w=1200&auto=format&fit=crop",
+  },
+  {
+    label: "Suncheon Bay",
+    koreanLabel: "순천만 국가정원",
+    url: "https://images.unsplash.com/photo-1448375240586-882707db888b?q=80&w=1200&auto=format&fit=crop",
+  },
+  {
+    label: "Seoraksan Mountain",
+    koreanLabel: "설악산 국립공원",
+    url: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1200&auto=format&fit=crop",
+  },
+];
 
 export default function PlacesView() {
   const { language, t } = useTranslation();
+  const { isAdmin, adminToken, setShowLoginModal } = useAdmin();
+
   const [selectedCityId, setSelectedCityId] = useState<string>("seoul");
   const [itineraryStyle, setItineraryStyle] = useState<"heritage" | "modern" | "gourmet">("heritage");
+
+  // Custom destinations and deletions
+  const [customDestinations, setCustomDestinations] = useState<Destination[]>([]);
+  const [deletedIds, setDeletedIds] = useState<string[]>([]);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  // Form states for adding a new destination
+  const [formName, setFormName] = useState("");
+  const [formKoreanName, setFormKoreanName] = useState("");
+  const [formTagline, setFormTagline] = useState("");
+  const [formDescription, setFormDescription] = useState("");
+  const [formLocation, setFormLocation] = useState("");
+  const [formCoverImage, setFormCoverImage] = useState(REAL_PHOTO_PRESETS[0].url);
+  const [formHighlights, setFormHighlights] = useState("");
+  const [formBestTime, setFormBestTime] = useState("");
+  const [formMustTry, setFormMustTry] = useState("");
+  const [formHiddenGem, setFormHiddenGem] = useState("");
+  const [formAttractionName, setFormAttractionName] = useState("");
+  const [formAttractionDesc, setFormAttractionDesc] = useState("");
+  const [formAttractionImage, setFormAttractionImage] = useState(REAL_PHOTO_PRESETS[0].url);
+
+  // Load custom and deleted data
+  useEffect(() => {
+    getCustomDestinations().then(setCustomDestinations);
+    setDeletedIds(getDeletedDestinationIds());
+  }, []);
+
+  // Combined destinations list
+  const mergedDestinations = useMemo(() => {
+    const defaults = DESTINATIONS.filter((d) => !deletedIds.includes(d.id));
+    const customs = customDestinations.filter((d) => !deletedIds.includes(d.id));
+    const list = [...defaults, ...customs];
+    return list.length > 0 ? list : DESTINATIONS.slice(0, 1);
+  }, [deletedIds, customDestinations]);
+
+  // Translate destination data dynamically
+  const { translatedData: translatedDestinations } = useTranslatedData(mergedDestinations, [
+    "name",
+    "tagline",
+    "description",
+    "highlights",
+    "attractions",
+    "travelTips",
+  ]);
+
+  // Ensure selectedCityId exists in translatedDestinations
+  const currentCity = useMemo(() => {
+    const found = translatedDestinations.find((d) => d.id === selectedCityId);
+    return found || translatedDestinations[0] || DESTINATIONS[0];
+  }, [translatedDestinations, selectedCityId]);
 
   // Dynamic Day Itinerary Database based on City & Travel Style
   const customItineraries: Record<string, Record<string, { time: string; activity: string; desc: string; icon: string }[]>> = {
@@ -81,26 +188,117 @@ export default function PlacesView() {
     },
   };
 
-  // Translate static destination data dynamically
-  const { translatedData: translatedDestinations } = useTranslatedData(DESTINATIONS, [
-    "name",
-    "tagline",
-    "description",
-    "highlights",
-    "attractions",
-    "travelTips"
-  ]);
-
-  const currentCity = useMemo(() => {
-    return translatedDestinations.find(d => d.id === selectedCityId) || translatedDestinations[0];
-  }, [translatedDestinations, selectedCityId]);
-
+  // Default itinerary generator for newly added custom destinations
   const rawItinerary = useMemo(() => {
-    return customItineraries[currentCity?.id || "seoul"]?.[itineraryStyle] || [];
+    if (customItineraries[currentCity?.id]) {
+      return customItineraries[currentCity.id][itineraryStyle] || [];
+    }
+    // Generated tailored itinerary for custom place
+    return [
+      {
+        time: "10:00 AM",
+        activity: `${currentCity.name} Morning Stroll`,
+        desc: `Discover the iconic local charm and scenic landscapes of ${currentCity.name}.`,
+        icon: "Compass",
+      },
+      {
+        time: "01:00 PM",
+        activity: `Authentic Local Flavors`,
+        desc: `Savor the region's culinary specialties: ${currentCity.travelTips?.mustTry || "Traditional local dish"}.`,
+        icon: "Coffee",
+      },
+      {
+        time: "05:00 PM",
+        activity: `${currentCity.travelTips?.hiddenGem || "Hidden Gem Discovery"}`,
+        desc: `Immerse in the calm sunset atmosphere at local secret vantage points.`,
+        icon: "Sunrise",
+      },
+    ];
   }, [currentCity, itineraryStyle]);
 
   // Translate current active itinerary on the fly
   const { translatedData: activeItinerary } = useTranslatedData(rawItinerary, ["activity", "desc"]);
+
+  // Handler: Add new destination
+  const handleAddDestination = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!formName.trim() || !formKoreanName.trim()) {
+      alert("도시/명소 영문 이름과 한글 이름을 입력해 주세요.");
+      return;
+    }
+
+    const highlightsArray = formHighlights
+      .split(",")
+      .map((h) => h.trim())
+      .filter(Boolean);
+
+    const newDest: Destination = {
+      id: "dest_" + Date.now(),
+      name: formName.trim(),
+      koreanName: formKoreanName.trim(),
+      tagline: formTagline.trim() || `${formName} - Timeless Korean Wonder`,
+      description: formDescription.trim() || `${formName} offers rich cultural encounters and breathtaking natural scenery.`,
+      coverImage: formCoverImage.trim(),
+      locationLabel: formLocation.trim() || "Republic of Korea",
+      highlights: highlightsArray.length > 0 ? highlightsArray : ["Scenic Vistas", "Historic Architecture", "Local Cuisine"],
+      travelTips: {
+        bestTime: formBestTime.trim() || "Spring & Autumn",
+        mustTry: formMustTry.trim() || "Traditional Regional Specialties",
+        hiddenGem: formHiddenGem.trim() || "Tranquil local alleyways & historic paths",
+      },
+      attractions: [
+        {
+          name: formAttractionName.trim() || `${formName} Primary Landmark`,
+          desc: formAttractionDesc.trim() || `The most famous cultural and scenic highlight of ${formName}.`,
+          image: formAttractionImage.trim() || formCoverImage.trim(),
+        },
+      ],
+      isCustom: true,
+    };
+
+    const saved = await addDestination(newDest, adminToken);
+    setCustomDestinations((prev) => [...prev.filter((d) => d.id !== saved.id), saved]);
+    setSelectedCityId(saved.id);
+    setIsAddModalOpen(false);
+
+    // Reset form
+    setFormName("");
+    setFormKoreanName("");
+    setFormTagline("");
+    setFormDescription("");
+    setFormLocation("");
+    setFormHighlights("");
+    setFormBestTime("");
+    setFormMustTry("");
+    setFormHiddenGem("");
+    setFormAttractionName("");
+    setFormAttractionDesc("");
+
+    setActionNotice(`'${saved.name} (${saved.koreanName})' 명소가 추천명소에 추가되었습니다!`);
+    setTimeout(() => setActionNotice(null), 3500);
+  };
+
+  // Handler: Delete destination
+  const handleDeleteCity = async (cityId: string, cityName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm(`'${cityName}' 추천명소를 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    await deleteDestination(cityId, adminToken);
+    setDeletedIds((prev) => [...prev, cityId]);
+    setCustomDestinations((prev) => prev.filter((d) => d.id !== cityId));
+
+    if (selectedCityId === cityId) {
+      const remaining = mergedDestinations.filter((d) => d.id !== cityId);
+      if (remaining.length > 0) {
+        setSelectedCityId(remaining[0].id);
+      }
+    }
+
+    setActionNotice(`'${cityName}' 명소가 삭제되었습니다.`);
+    setTimeout(() => setActionNotice(null), 3500);
+  };
 
   return (
     <div className="space-y-12">
@@ -114,8 +312,45 @@ export default function PlacesView() {
           <Translate>Curated Destinations of South Korea</Translate>
         </h1>
         <p className="text-xs md:text-sm text-stone-500 font-sans leading-relaxed">
-          <Translate>Traverse four legendary cultural capitals—from neon sky-high metropolises to volcanic wonders and historical king tombs.</Translate>
+          <Translate>Traverse legendary cultural capitals—from neon sky-high metropolises to volcanic wonders and historical king tombs.</Translate>
         </p>
+
+        {/* Admin status pill & actions */}
+        <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5">
+          {isAdmin ? (
+            <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-300 px-3 py-1.5 rounded-full text-xs text-amber-900">
+              <ShieldCheck className="w-4 h-4 text-amber-600" />
+              <span className="font-semibold"><Translate>관리자 모드 활성화</Translate></span>
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="ml-1 bg-stone-900 hover:bg-stone-850 text-white px-3 py-1 rounded-full text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+              >
+                <Plus className="w-3 h-3 text-amber-400" />
+                <span><Translate>추천명소 추가</Translate></span>
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowLoginModal(true)}
+              className="text-xs text-stone-500 hover:text-stone-900 flex items-center gap-1.5 bg-white border border-stone-200/80 hover:border-stone-400 px-3 py-1.5 rounded-full transition-all cursor-pointer shadow-2xs"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-stone-400" />
+              <span><Translate>관리자로 로그인하여 명소 추가/삭제</Translate></span>
+            </button>
+          )}
+        </div>
+
+        {/* Action Notice Toast */}
+        {actionNotice && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-2.5 bg-stone-900 text-amber-400 border border-amber-400/30 rounded-xl text-xs font-medium inline-flex items-center gap-2 shadow-lg"
+          >
+            <Check className="w-4 h-4 text-emerald-400" />
+            <span>{actionNotice}</span>
+          </motion.div>
+        )}
       </section>
 
       {/* City Navigator Tabs */}
@@ -123,24 +358,53 @@ export default function PlacesView() {
         {/* Left Side: City Buttons */}
         <div className="md:w-1/4 flex flex-col gap-2">
           {translatedDestinations.map((city) => (
-            <button
-              key={city.id}
-              onClick={() => setSelectedCityId(city.id)}
-              className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between group cursor-pointer ${
-                selectedCityId === city.id
-                  ? "bg-stone-900 text-white border-stone-950 shadow-md"
-                  : "bg-white text-stone-600 border-stone-200/60 hover:bg-stone-50"
-              }`}
-            >
-              <div>
-                <span className="text-[10px] font-mono block uppercase tracking-wider opacity-60">
-                  {city.koreanName}
-                </span>
-                <h3 className="font-display font-bold text-sm md:text-base mt-0.5">{city.name}</h3>
-              </div>
-              <ChevronRight className={`w-4 h-4 transition-transform ${selectedCityId === city.id ? "translate-x-1 text-white" : "text-stone-400 group-hover:translate-x-1"}`} />
-            </button>
+            <div key={city.id} className="relative group">
+              <button
+                onClick={() => setSelectedCityId(city.id)}
+                className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between cursor-pointer ${
+                  selectedCityId === city.id
+                    ? "bg-stone-900 text-white border-stone-950 shadow-md"
+                    : "bg-white text-stone-600 border-stone-200/60 hover:bg-stone-50"
+                }`}
+              >
+                <div>
+                  <span className="text-[10px] font-mono block uppercase tracking-wider opacity-60">
+                    {language === "ko" ? city.name : city.koreanName}
+                  </span>
+                  <h3 className="font-display font-bold text-sm md:text-base mt-0.5">
+                    {language === "ko" ? (city.koreanName || city.name) : <Translate>{city.name}</Translate>}
+                  </h3>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {isAdmin && (
+                    <button
+                      onClick={(e) => handleDeleteCity(city.id, city.name, e)}
+                      title="명소 삭제 (관리자)"
+                      className="p-1.5 rounded-lg text-red-400 hover:text-white hover:bg-red-600/80 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <ChevronRight
+                    className={`w-4 h-4 transition-transform ${
+                      selectedCityId === city.id ? "translate-x-1 text-white" : "text-stone-400 group-hover:translate-x-1"
+                    }`}
+                  />
+                </div>
+              </button>
+            </div>
           ))}
+
+          {/* Quick Add Button on Left Column when Admin */}
+          {isAdmin && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="w-full p-3.5 rounded-2xl border-2 border-dashed border-stone-300 hover:border-amber-500 text-stone-600 hover:text-stone-950 flex items-center justify-center gap-2 text-xs font-semibold transition-all cursor-pointer bg-white/50 hover:bg-amber-50/30"
+            >
+              <Plus className="w-4 h-4 text-amber-600" />
+              <span><Translate>+ 새 추천명소 추가</Translate></span>
+            </button>
+          )}
         </div>
 
         {/* Right Side: Selected City Highlights Banner */}
@@ -163,15 +427,39 @@ export default function PlacesView() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/20 to-transparent" />
                 <span className="absolute top-4 left-4 text-[9px] font-mono bg-white/10 backdrop-blur-md border border-white/20 text-white px-3 py-1 rounded-full uppercase">
-                  {currentCity.locationLabel}
+                  <Translate>{currentCity.locationLabel}</Translate>
                 </span>
+
+                {isAdmin && (
+                  <button
+                    onClick={(e) => handleDeleteCity(currentCity.id, currentCity.name, e)}
+                    className="absolute top-4 right-4 bg-red-600/90 hover:bg-red-700 text-white px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 backdrop-blur-xs transition-colors cursor-pointer shadow-md"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span><Translate>이 명소 삭제</Translate></span>
+                  </button>
+                )}
+
                 <div className="absolute bottom-4 left-4 right-4 text-white">
                   <h2 className="text-xl md:text-2xl font-display font-bold flex items-baseline gap-2">
-                    {currentCity.name}
-                    <span className="text-xs font-sans text-stone-300 font-normal">({cityKoreanName(currentCity.id)})</span>
+                    {language === "ko" ? (
+                      <>
+                        <span>{currentCity.koreanName || currentCity.name}</span>
+                        {currentCity.name && currentCity.name !== currentCity.koreanName && (
+                          <span className="text-xs font-sans text-stone-300 font-normal">({currentCity.name})</span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <span><Translate>{currentCity.name}</Translate></span>
+                        {currentCity.koreanName && (
+                          <span className="text-xs font-sans text-stone-300 font-normal">({currentCity.koreanName})</span>
+                        )}
+                      </>
+                    )}
                   </h2>
                   <p className="text-xs text-stone-200 italic mt-1">
-                    "{currentCity.tagline}"
+                    "<Translate>{currentCity.tagline}</Translate>"
                   </p>
                 </div>
               </div>
@@ -180,7 +468,7 @@ export default function PlacesView() {
                 <div className="space-y-2">
                   <h4 className="text-[10px] font-mono text-stone-400 uppercase tracking-widest"><Translate>Introduction</Translate></h4>
                   <p className="text-xs text-stone-600 leading-relaxed font-sans">
-                    {currentCity.description}
+                    <Translate>{currentCity.description}</Translate>
                   </p>
                 </div>
 
@@ -189,7 +477,9 @@ export default function PlacesView() {
                   {currentCity.highlights.map((highlight, index) => (
                     <div key={index} className="flex items-center gap-2 bg-stone-50 border border-stone-200/30 p-2.5 rounded-xl">
                       <Star className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                      <span className="text-[11px] font-sans font-medium text-stone-700">{highlight}</span>
+                      <span className="text-[11px] font-sans font-medium text-stone-700">
+                        <Translate>{highlight}</Translate>
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -206,7 +496,10 @@ export default function PlacesView() {
             <Landmark className="w-5 h-5 text-stone-800" />
             <Translate>Top Curated Sights & Landmarks</Translate>
           </h2>
-          <p className="text-xs text-stone-500"><Translate>Must-see architectural, artistic, and natural locations in</Translate> {currentCity.name}.</p>
+          <p className="text-xs text-stone-500">
+            <Translate>Must-see architectural, artistic, and natural locations in</Translate>{" "}
+            {language === "ko" ? (currentCity.koreanName || currentCity.name) : <Translate>{currentCity.name}</Translate>}.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -223,8 +516,12 @@ export default function PlacesView() {
                   <div className="absolute inset-0 bg-gradient-to-t from-stone-950/40 to-transparent" />
                 </div>
                 <div className="p-5 space-y-1.5">
-                  <h3 className="font-display font-bold text-stone-900 text-sm">{attraction.name}</h3>
-                  <p className="text-xs text-stone-500 leading-relaxed font-sans">{attraction.desc}</p>
+                  <h3 className="font-display font-bold text-stone-900 text-sm">
+                    <Translate>{attraction.name}</Translate>
+                  </h3>
+                  <p className="text-xs text-stone-500 leading-relaxed font-sans">
+                    <Translate>{attraction.desc}</Translate>
+                  </p>
                 </div>
               </div>
               <div className="px-5 pb-5 pt-3 border-t border-stone-100 flex items-center justify-between">
@@ -242,57 +539,58 @@ export default function PlacesView() {
       <section className="bg-white rounded-3xl p-6 border border-stone-200/60 shadow-xs space-y-6">
         <div className="space-y-1">
           <h3 className="font-display font-bold text-stone-900 text-base"><Translate>Travel Intelligence Dashboard</Translate></h3>
-          <p className="text-[11px] text-stone-500"><Translate>Important local travel data tailored specifically for</Translate> {currentCity.name}.</p>
+          <p className="text-[11px] text-stone-500">
+            <Translate>Important local travel data tailored specifically for</Translate>{" "}
+            {language === "ko" ? (currentCity.koreanName || currentCity.name) : <Translate>{currentCity.name}</Translate>}.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
           <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-100/60 space-y-2">
             <span className="text-[10px] text-amber-800 font-mono font-semibold uppercase tracking-wider block"><Translate>Best Time to Visit</Translate></span>
-            <p className="text-stone-700 leading-relaxed font-sans">{currentCity.travelTips.bestTime}</p>
+            <p className="text-stone-700 leading-relaxed font-sans">
+              <Translate>{currentCity.travelTips?.bestTime || "Spring & Autumn"}</Translate>
+            </p>
+          </div>
+          <div className="p-4 rounded-2xl bg-rose-50/50 border border-rose-100/60 space-y-2">
+            <span className="text-[10px] text-rose-800 font-mono font-semibold uppercase tracking-wider block"><Translate>Must-Try Gourmet</Translate></span>
+            <p className="text-stone-700 leading-relaxed font-sans">
+              <Translate>{currentCity.travelTips?.mustTry || "Local cuisine specialties"}</Translate>
+            </p>
           </div>
           <div className="p-4 rounded-2xl bg-teal-50/50 border border-teal-100/60 space-y-2">
-            <span className="text-[10px] text-teal-800 font-mono font-semibold uppercase tracking-wider block"><Translate>Must-Try Culinary/Activity</Translate></span>
-            <p className="text-stone-700 leading-relaxed font-sans">{currentCity.travelTips.mustTry}</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200/60 space-y-2">
-            <span className="text-[10px] text-stone-500 font-mono font-semibold uppercase tracking-wider block"><Translate>Local Hidden Gem</Translate></span>
-            <p className="text-stone-700 leading-relaxed font-sans">{currentCity.travelTips.hiddenGem}</p>
+            <span className="text-[10px] text-teal-800 font-mono font-semibold uppercase tracking-wider block"><Translate>Hidden Gem</Translate></span>
+            <p className="text-stone-700 leading-relaxed font-sans">
+              <Translate>{currentCity.travelTips?.hiddenGem || "Secret scenic trail"}</Translate>
+            </p>
           </div>
         </div>
       </section>
 
-      {/* Interactive Feature: 24-Hour Day Itinerary Planner */}
-      <section className="bg-stone-950 text-white rounded-3xl p-6 md:p-8 border border-stone-800 shadow-xl space-y-8 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl" />
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+      {/* Interactive 24-Hour Day Designer */}
+      <section className="bg-stone-950 text-white rounded-3xl p-6 md:p-8 border border-stone-850 space-y-8 relative overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-800 pb-6">
           <div className="space-y-1">
-            <span className="text-[10px] font-mono tracking-widest text-teal-400 uppercase"><Translate>Interactive Lab</Translate></span>
-            <h2 className="text-xl md:text-2xl font-display font-bold text-white tracking-tight flex items-center gap-2">
-              <Compass className="w-5 h-5 text-teal-400" />
-              <Translate>Day-Trip Custom Itinerary Planner</Translate>
-            </h2>
-            <p className="text-xs text-stone-400"><Translate>Generate a custom 24-hour visual itinerary based on your travel personality.</Translate></p>
+            <span className="text-[10px] font-mono tracking-widest text-teal-400 uppercase"><Translate>Smart Travel Planner</Translate></span>
+            <h3 className="text-lg md:text-xl font-display font-bold">
+              <Translate>24-Hour Curated Itinerary</Translate>: {language === "ko" ? (currentCity.koreanName || currentCity.name) : <Translate>{currentCity.name}</Translate>}
+            </h3>
+            <p className="text-xs text-stone-400 font-sans"><Translate>Pick your personal exploration style to reconfigure the day.</Translate></p>
           </div>
 
-          {/* Style Selector */}
-          <div className="flex bg-stone-900 border border-stone-800 p-1 rounded-xl">
-            {[
-              { id: "heritage", label: "Heritage Walk" },
-              { id: "modern", label: "Future Tech" },
-              { id: "gourmet", label: "Culinary" },
-            ].map((style) => (
+          {/* Style Selector Tabs */}
+          <div className="flex bg-stone-900 p-1 rounded-xl border border-stone-800">
+            {(["heritage", "modern", "gourmet"] as const).map((style) => (
               <button
-                key={style.id}
-                onClick={() => setItineraryStyle(style.id as any)}
-                className={`px-3.5 py-1.5 rounded-lg text-[10px] font-mono uppercase tracking-wider font-semibold transition-all cursor-pointer ${
-                  itineraryStyle === style.id
-                    ? "bg-teal-500 text-stone-950 font-bold shadow-xs"
+                key={style}
+                onClick={() => setItineraryStyle(style)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium capitalize transition-all cursor-pointer ${
+                  itineraryStyle === style
+                    ? "bg-teal-500 text-stone-950 font-semibold shadow-xs"
                     : "text-stone-400 hover:text-white"
                 }`}
               >
-                <Translate>{style.label}</Translate>
+                <Translate>{style}</Translate>
               </button>
             ))}
           </div>
@@ -327,16 +625,213 @@ export default function PlacesView() {
           ))}
         </div>
       </section>
+
+      {/* Modal: Add New Destination (Admin Only) */}
+      <AnimatePresence>
+        {isAddModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.94 }}
+              className="bg-white rounded-3xl shadow-2xl border border-stone-200 max-w-2xl w-full my-8 overflow-hidden"
+            >
+              {/* Header */}
+              <div className="bg-stone-900 text-white p-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-teal-400 text-stone-950 flex items-center justify-center font-bold">
+                    <Plus className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-lg"><Translate>새 추천명소 수동 등록</Translate></h3>
+                    <p className="text-xs text-stone-300"><Translate>대한민국의 새로운 명소를 등록하여 여행자들에게 선보입니다.</Translate></p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="p-1 text-stone-400 hover:text-white rounded-full hover:bg-stone-800 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleAddDestination} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+                {/* Names */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-stone-700">
+                      영문 명소/도시명 * (e.g. Jeonju, Gangneung)
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formName}
+                      onChange={(e) => setFormName(e.target.value)}
+                      placeholder="e.g. Jeonju"
+                      className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-teal-400 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-stone-700">
+                      한글 명소/도시명 * (e.g. 전주, 강릉)
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formKoreanName}
+                      onChange={(e) => setFormKoreanName(e.target.value)}
+                      placeholder="e.g. 전주"
+                      className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-teal-400 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Tagline & Location */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-stone-700">슬로건 / 한줄 소개 (Tagline)</label>
+                    <input
+                      type="text"
+                      value={formTagline}
+                      onChange={(e) => setFormTagline(e.target.value)}
+                      placeholder="e.g. UNESCO Gastronomy Capital & Historic Hanok Alleys"
+                      className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-teal-400 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-stone-700">위치 / 좌표 (Location Label)</label>
+                    <input
+                      type="text"
+                      value={formLocation}
+                      onChange={(e) => setFormLocation(e.target.value)}
+                      placeholder="e.g. 35.8242° N, 127.1480° E (Jeolla)"
+                      className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-teal-400 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-stone-700">상세 설명 (Description)</label>
+                  <textarea
+                    rows={3}
+                    value={formDescription}
+                    onChange={(e) => setFormDescription(e.target.value)}
+                    placeholder="해당 명소의 역사, 풍경, 문화적 가치에 대한 설명을 적어주세요."
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-teal-400 outline-none resize-none"
+                  />
+                </div>
+
+                {/* Real Photo Cover Image Direct Upload / URL / Presets (Strict adherence to AGENTS.md) */}
+                <ImageUploader
+                  value={formCoverImage}
+                  onChange={(val) => {
+                    setFormCoverImage(val);
+                    if (!formAttractionImage) {
+                      setFormAttractionImage(val);
+                    }
+                  }}
+                  presets={REAL_PHOTO_PRESETS}
+                  label="고화질 실사 명소 대표 사진 (Real Photo)"
+                  recommendedAspect="16:9 권장"
+                />
+
+                {/* Highlights */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-stone-700">주요 특징 태그 (쉼표로 구분)</label>
+                  <input
+                    type="text"
+                    value={formHighlights}
+                    onChange={(e) => setFormHighlights(e.target.value)}
+                    placeholder="e.g. 한옥마을, 야간 산책, 전통 막걸리 골목, 전주 비빔밥"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-2 focus:ring-teal-400 outline-none"
+                  />
+                </div>
+
+                {/* Travel Tips: Best Time, Must Try, Hidden Gem */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-stone-700">방문 추천 시기</label>
+                    <input
+                      type="text"
+                      value={formBestTime}
+                      onChange={(e) => setFormBestTime(e.target.value)}
+                      placeholder="e.g. 10월~11월 가을 단풍철"
+                      className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-teal-400 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-stone-700">대표 먹거리 (Must Try)</label>
+                    <input
+                      type="text"
+                      value={formMustTry}
+                      onChange={(e) => setFormMustTry(e.target.value)}
+                      placeholder="e.g. 전주 전통비빔밥, 수제 초코파이"
+                      className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-teal-400 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-stone-700">숨은 명소 (Hidden Gem)</label>
+                    <input
+                      type="text"
+                      value={formHiddenGem}
+                      onChange={(e) => setFormHiddenGem(e.target.value)}
+                      placeholder="e.g. 오목대 언덕 한옥 기와지붕 전망"
+                      className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-teal-400 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Primary Attraction */}
+                <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-3">
+                  <span className="text-xs font-bold text-stone-800 block">대표 랜드마크 스팟 1곳 등록</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-stone-600">스팟 이름</label>
+                      <input
+                        type="text"
+                        value={formAttractionName}
+                        onChange={(e) => setFormAttractionName(e.target.value)}
+                        placeholder="e.g. 전주 한옥마을 경기전"
+                        className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-xs outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-stone-600">스팟 설명</label>
+                      <input
+                        type="text"
+                        value={formAttractionDesc}
+                        onChange={(e) => setFormAttractionDesc(e.target.value)}
+                        placeholder="e.g. 태조 이성계의 어진을 모신 역사적인 사당"
+                        className="w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-xs outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="pt-2 flex justify-end gap-3 border-t border-stone-200">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="px-5 py-2.5 rounded-xl text-xs font-medium text-stone-600 hover:bg-stone-100 transition-colors cursor-pointer"
+                  >
+                    <Translate>취소</Translate>
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl text-xs font-semibold bg-stone-900 hover:bg-stone-850 text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+                  >
+                    <Plus className="w-4 h-4 text-teal-400" />
+                    <span><Translate>추천명소 등록 완료</Translate></span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
-}
-
-function cityKoreanName(id: string): string {
-  switch (id) {
-    case "seoul": return "서울";
-    case "jeju": return "제주도";
-    case "gyeongju": return "경주";
-    case "busan": return "부산";
-    default: return "";
-  }
 }

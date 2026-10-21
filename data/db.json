@@ -1,0 +1,23 @@
+{
+  "postcards": [
+    {
+      "cardNumber": 48291,
+      "recipientName": "지우에게",
+      "customMessage": "따뜻한 정이 넘치는 날들 되길 바랍니다.",
+      "conceptHangul": "정",
+      "conceptRomanization": "Jeong",
+      "conceptMeaning": "Deep emotional bond",
+      "styleId": "moon-jar",
+      "styleName": "Moon Jar Minimal",
+      "bgGradient": "from-stone-900 to-stone-950",
+      "textColor": "text-stone-100",
+      "fontStyle": "font-serif",
+      "id": "card_1792546020872_72z1",
+      "createdAt": "2026-10-21T01:27:00.872Z"
+    }
+  ],
+  "destinations": [],
+  "festivals": [],
+  "deletedDestinationIds": [],
+  "deletedFestivalIds": []
+}
