@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Compass, BookOpen, Utensils, MapPin, CalendarDays, PlaneLanding, ChevronDown, ShieldCheck, LogOut } from "lucide-react";
+import { Compass, BookOpen, Utensils, MapPin, CalendarDays, PlaneLanding, ChevronDown, ShieldCheck, LogOut, Share2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useTranslation, LANGUAGES, LanguageCode, Translate } from "../context/LanguageContext";
 import { useAdmin } from "../context/AdminContext";
@@ -8,9 +8,10 @@ import KoreaLogoIcon from "./KoreaLogoIcon";
 interface NavbarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  onOpenShareModal?: () => void;
 }
 
-export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
+export default function Navbar({ activeTab, setActiveTab, onOpenShareModal }: NavbarProps) {
   const { language, setLanguage, t } = useTranslation();
   const { isAdmin, logout, setShowLoginModal } = useAdmin();
   const [langOpen, setLangOpen] = useState(false);
@@ -70,7 +71,19 @@ export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
             })}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            {/* Global Promotion & Share Button */}
+            {onOpenShareModal && (
+              <button
+                onClick={onOpenShareModal}
+                title="Share corea-labs.com with travelers worldwide"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white transition-all text-xs font-semibold rounded-full cursor-pointer shadow-xs hover:scale-[1.02]"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span className="text-[11px]"><Translate>공유 & 초대</Translate></span>
+              </button>
+            )}
+
             {/* Premium Language Dropdown */}
             <div className="relative">
               <button 
@@ -152,7 +165,18 @@ export default function Navbar({ activeTab, setActiveTab }: NavbarProps) {
           <span className="font-display font-bold text-stone-900 tracking-tight text-xs">COREA LABS</span>
         </button>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {/* Mobile Share & Promote Button */}
+          {onOpenShareModal && (
+            <button
+              onClick={onOpenShareModal}
+              className="p-1.5 rounded-full bg-amber-500 text-white cursor-pointer shadow-xs"
+              title="Share corea-labs.com"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           {/* Mobile Admin Button */}
           {isAdmin ? (
             <button

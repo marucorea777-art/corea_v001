@@ -10,10 +10,12 @@ import TravelView from "./components/TravelView";
 import { LanguageProvider, Translate } from "./context/LanguageContext";
 import { AdminProvider, useAdmin } from "./context/AdminContext";
 import AdminLoginModal from "./components/AdminLoginModal";
+import GlobalShareModal from "./components/GlobalShareModal";
 import KoreaLogoIcon from "./components/KoreaLogoIcon";
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState<string>("home");
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const { isAdmin, setShowLoginModal, logout } = useAdmin();
 
   const handleSetTab = (tab: string) => {
@@ -25,7 +27,7 @@ function MainApp() {
   const renderActiveView = () => {
     switch (activeTab) {
       case "home":
-        return <HomeView setActiveTab={handleSetTab} />;
+        return <HomeView setActiveTab={handleSetTab} onOpenShareModal={() => setIsShareModalOpen(true)} />;
       case "heritage":
         return <HeritageView />;
       case "culture":
@@ -37,7 +39,7 @@ function MainApp() {
       case "travel":
         return <TravelView />;
       default:
-        return <HomeView setActiveTab={handleSetTab} />;
+        return <HomeView setActiveTab={handleSetTab} onOpenShareModal={() => setIsShareModalOpen(true)} />;
     }
   };
 
@@ -45,7 +47,7 @@ function MainApp() {
     <div className="min-h-screen bg-[#faf9f6] flex flex-col justify-between font-sans selection:bg-amber-100 selection:text-stone-900">
       
       {/* Premium Header/Navbar */}
-      <Navbar activeTab={activeTab} setActiveTab={handleSetTab} />
+      <Navbar activeTab={activeTab} setActiveTab={handleSetTab} onOpenShareModal={() => setIsShareModalOpen(true)} />
 
       {/* Main Content Arena with fluid, desktop-precision containers */}
       <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-20 pb-28 md:pt-26 md:pb-12 flex-grow">
@@ -86,7 +88,12 @@ function MainApp() {
             <button onClick={() => handleSetTab("culture")} className="hover:text-stone-900 transition-colors cursor-pointer"><Translate>Culture</Translate></button>
             <button onClick={() => handleSetTab("places")} className="hover:text-stone-900 transition-colors cursor-pointer"><Translate>Places</Translate></button>
             <button onClick={() => handleSetTab("festivals")} className="hover:text-stone-900 transition-colors cursor-pointer"><Translate>Festivals</Translate></button>
-            <button onClick={() => handleSetTab("travel")} className="hover:text-stone-900 transition-colors cursor-pointer"><Translate>Guide</Translate></button>
+            <button 
+              onClick={() => setIsShareModalOpen(true)} 
+              className="text-amber-600 hover:text-amber-800 transition-colors cursor-pointer font-medium flex items-center gap-1"
+            >
+              <span>🌐</span> <Translate>공유 & 친구 초대</Translate>
+            </button>
             <span className="text-stone-300">|</span>
             {isAdmin ? (
               <button 
@@ -107,6 +114,12 @@ function MainApp() {
 
         </div>
       </footer>
+
+      {/* Global Share & Promote Modal */}
+      <GlobalShareModal 
+        isOpen={isShareModalOpen} 
+        onClose={() => setIsShareModalOpen(false)} 
+      />
 
       {/* Global Admin Login Modal */}
       <AdminLoginModal />

@@ -48,6 +48,16 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<LanguageCode>(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlLang = urlParams.get("lang") as LanguageCode | null;
+      if (urlLang && LANGUAGES.some(l => l.code === urlLang)) {
+        localStorage.setItem("corea_labs_lang", urlLang);
+        return urlLang;
+      }
+    } catch {
+      // ignore
+    }
     const saved = localStorage.getItem("corea_labs_lang");
     return (saved as LanguageCode) || "en";
   });

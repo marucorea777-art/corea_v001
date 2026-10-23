@@ -10,7 +10,11 @@ import {
   ArrowRight, 
   CheckSquare, 
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  PhoneCall,
+  Share2,
+  Copy,
+  Check
 } from "lucide-react";
 import { useTranslation, Translate } from "../context/LanguageContext";
 
@@ -44,6 +48,7 @@ const DEFAULT_RATES: Record<SupportedCurrency, number> = {
 export default function TravelView() {
   const { language, t } = useTranslation();
   const [activeSubTab, setActiveSubTab] = useState<"visa" | "arrival" | "finance">("visa");
+  const [copiedLink, setCopiedLink] = useState(false);
   
   // Interactive Checklist State
   const [checklist, setChecklist] = useState<ChecklistItem[]>([
@@ -594,6 +599,41 @@ export default function TravelView() {
               >
                 <RefreshCw className="w-3 h-3" />
                 <Translate>체크리스트 초기화하기</Translate>
+              </button>
+            </div>
+          </div>
+
+          {/* 24/7 Global Tourist Helpline & Share corea-labs.com */}
+          <div className="bg-gradient-to-br from-stone-900 to-stone-950 rounded-3xl p-6 text-white border border-stone-800 shadow-md space-y-4">
+            <div className="flex items-center gap-2 text-amber-400">
+              <PhoneCall className="w-4 h-4 animate-bounce" />
+              <span className="font-mono text-xs font-bold tracking-wider uppercase">
+                <Translate>24/7 Korea Travel Helpline (1330)</Translate>
+              </span>
+            </div>
+
+            <p className="text-xs text-stone-300 font-sans leading-relaxed">
+              <Translate>Free interpretation & emergency travel guidance for foreign visitors provided by the Korea Tourism Organization. Available in English, Japanese, Chinese, and Russian.</Translate>
+            </p>
+
+            <div className="flex items-center gap-2 pt-1">
+              <a
+                href="tel:1330"
+                className="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-stone-950 text-xs font-bold text-center transition-colors cursor-pointer"
+              >
+                📞 Call 1330 Now
+              </a>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText("https://corea-labs.com/#travel");
+                  setCopiedLink(true);
+                  setTimeout(() => setCopiedLink(false), 2500);
+                }}
+                className="py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer border border-white/15"
+                title="Share this Travel Guide"
+              >
+                {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedLink ? "Copied" : "Share Guide"}</span>
               </button>
             </div>
           </div>

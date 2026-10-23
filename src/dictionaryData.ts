@@ -177,6 +177,8 @@ export const UI_DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     "REALTIME ESTIMATOR": "실시간 환산기",
     "실시간 원화 환산기": "실시간 원화 환산기",
     "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.": "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.",
+    "공유 & 초대": "공유 & 초대",
+    "공유 & 친구 초대": "공유 & 친구 초대",
   },
 
   en: {
@@ -355,6 +357,8 @@ export const UI_DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     "REALTIME ESTIMATOR": "REALTIME ESTIMATOR",
     "실시간 원화 환산기": "Real-time KRW Converter",
     "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.": "Calculates exact KRW value using live foreign exchange benchmark rates.",
+    "공유 & 초대": "Share & Invite",
+    "공유 & 친구 초대": "Share with Friends",
   },
 
   ja: {
@@ -530,6 +534,8 @@ export const UI_DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     "REALTIME ESTIMATOR": "リアルタイム換算機",
     "실시간 원화 환산기": "リアルタイムウォン換算機",
     "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.": "実時間基準為替レートで正確なウォン価値を計算します。",
+    "공유 & 초대": "共有・招待",
+    "공유 & 친구 초대": "友達と共有・招待",
   },
 
   zh: {
@@ -705,6 +711,8 @@ export const UI_DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     "REALTIME ESTIMATOR": "实时换算器",
     "실시간 원화 환산기": "实时韩元换算器",
     "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.": "使用实时基准汇率精确计算韩元价值。",
+    "공유 & 초대": "分享与邀请",
+    "공유 & 친구 초대": "与好友分享",
   },
 
   th: {
@@ -880,6 +888,8 @@ export const UI_DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     "REALTIME ESTIMATOR": "คำนวณอัตราแลกเปลี่ยนสด",
     "실시간 원화 환산기": "แปลงค่าเงินวอนเรียลไทม์",
     "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.": "คำนวณค่าเงินวอนที่แน่นอนด้วยอัตราแลกเปลี่ยนทางการแบบเรียลไทม์",
+    "공유 & 초대": "แชร์และชวนเพื่อน",
+    "공유 & 친구 초대": "แชร์ให้เพื่อน",
   },
 
   fr: {
@@ -1046,6 +1056,8 @@ export const UI_DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     "REALTIME ESTIMATOR": "ESTIMATEUR EN TEMPS RÉEL",
     "실시간 원화 환산기": "Convertisseur KRW en Temps Réel",
     "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.": "Calcule la valeur exacte en KRW selon les taux officiels en direct.",
+    "공유 & 초대": "Partager & Inviter",
+    "공유 & 친구 초대": "Partager avec des amis",
   },
 
   es: {
@@ -1212,6 +1224,8 @@ export const UI_DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     "REALTIME ESTIMATOR": "ESTIMADOR EN TIEMPO REAL",
     "실시간 원화 환산기": "Conversor de KRW en Tiempo Real",
     "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.": "Calcula el valor exacto de KRW con tipos de cambio oficiales en vivo.",
+    "공유 & 초대": "Compartir e invitar",
+    "공유 & 친구 초대": "Compartir con amigos",
   },
 
   pt: {
@@ -1378,6 +1392,8 @@ export const UI_DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     "REALTIME ESTIMATOR": "ESTIMADOR EM TEMPO REAL",
     "실시간 원화 환산기": "Conversor de KRW em Tempo Real",
     "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.": "Calcula o valor exato em KRW com base nas taxas oficiais ao vivo.",
+    "공유 & 초대": "Compartilhar e Convidar",
+    "공유 & 친구 초대": "Compartilhar com Amigos",
   },
 
   ka: {
@@ -1544,6 +1560,8 @@ export const UI_DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     "REALTIME ESTIMATOR": "რეალური კალკულატორი",
     "실시간 원화 환산기": "ვონის რეალურ დროში გადამყვანი",
     "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.": "გამოთვლის ზუსტ ღირებულებას ცოცხალი კურსით.",
+    "공유 & 초대": "გაზიარება და მოწვევა",
+    "공유 & 친구 초대": "მეგობრებთან გაზიარება",
   },
 
   ru: {
@@ -1710,6 +1728,8 @@ export const UI_DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     "REALTIME ESTIMATOR": "КОНВЕРТЕР В РЕАЛЬНОМ ВРЕМЕНИ",
     "실시간 원화 환산기": "Конвертер воны в реальном времени",
     "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.": "Точный расчет стоимости воны по актуальному рыночному курсу.",
+    "공유 & 초대": "Поделиться и пригласить",
+    "공유 & 친구 초대": "Поделиться с друзьями",
   },
 
   uk: {
@@ -1876,5 +1896,7 @@ export const UI_DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     "REALTIME ESTIMATOR": "КОНВЕРТЕР У РЕАЛЬНОМУ ЧАСІ",
     "실시간 원화 환산기": "Конвертер вони в реальному часі",
     "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.": "Точний розрахунок вартості вони за актуальним курсом.",
+    "공유 & 초대": "Поділитися та запросити",
+    "공유 & 친구 초대": "Поділитися з друзями",
   },
 };

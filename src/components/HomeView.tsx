@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { ArrowUpRight, Award, Compass, Heart, History, Sparkles, ChevronRight, Zap } from "lucide-react";
+import { ArrowUpRight, Award, Compass, Heart, History, Sparkles, ChevronRight, Zap, Globe, Share2, QrCode, Copy, Check } from "lucide-react";
 import { useState } from "react";
 import { DESTINATIONS, FESTIVALS, HERITAGE_ITEMS, HANGUL_CONCEPTS } from "../data";
 import { useTranslatedData, useTranslation, Translate } from "../context/LanguageContext";
@@ -9,10 +9,12 @@ import hanbokCourtImg from "../assets/images/hanbok_court_1784268718628.jpg";
 
 interface HomeViewProps {
   setActiveTab: (tab: string) => void;
+  onOpenShareModal?: () => void;
 }
 
-export default function HomeView({ setActiveTab }: HomeViewProps) {
+export default function HomeView({ setActiveTab, onOpenShareModal }: HomeViewProps) {
   const { language, t } = useTranslation();
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null);
   const [quizSubmitted, setQuizSubmitted] = useState(false);
 
@@ -413,6 +415,104 @@ export default function HomeView({ setActiveTab }: HomeViewProps) {
               <Translate>View Seasonal Event Calendars</Translate>
             </button>
           </div>
+        </div>
+      </section>
+
+      {/* Global Traveler Promotion & Viral Hub for corea-labs.com */}
+      <section className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-stone-900 via-stone-800 to-stone-950 text-white p-8 md:p-12 border border-stone-800 shadow-xl">
+        <div 
+          className="absolute inset-0 bg-cover bg-center opacity-25 mix-blend-overlay"
+          style={{ backgroundImage: `url(${seoulSkylineHeroImg})` }}
+        />
+        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          
+          <div className="lg:col-span-8 space-y-4 text-left">
+            <div className="inline-flex items-center gap-2 bg-amber-400/15 border border-amber-400/30 px-3.5 py-1 rounded-full text-xs font-mono font-medium text-amber-300">
+              <Globe className="w-3.5 h-3.5 animate-pulse" />
+              <span>corea-labs.com</span>
+              <span className="text-stone-400">•</span>
+              <span className="text-[11px]"><Translate>Global Travel Discovery</Translate></span>
+            </div>
+
+            <h3 className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight leading-snug">
+              <Translate>Traveling to Korea or Know Someone Who Is?</Translate> <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-stone-200 to-teal-300">
+                <Translate>Share corea-labs.com with Fellow Travelers!</Translate>
+              </span>
+            </h3>
+
+            <p className="text-xs md:text-sm text-stone-300 font-sans leading-relaxed max-w-2xl">
+              <Translate>corea-labs.com is the free international guide to South Korea's authentic seasonal festivals, 5 grand royal palaces, UNESCO world heritage, and local cultural secrets — translated into 11 languages with 24/7 travel tips.</Translate>
+            </p>
+
+            {/* Quick Feature Badges for Foreigners */}
+            <div className="flex flex-wrap gap-2 pt-1 text-[11px] font-mono text-stone-300">
+              <span className="px-2.5 py-1 rounded-lg bg-white/10 backdrop-blur-xs border border-white/15">
+                🌐 11 Languages
+              </span>
+              <span className="px-2.5 py-1 rounded-lg bg-white/10 backdrop-blur-xs border border-white/15">
+                🏮 25+ Real Festivals
+              </span>
+              <span className="px-2.5 py-1 rounded-lg bg-white/10 backdrop-blur-xs border border-white/15">
+                📱 Zero App Install Needed
+              </span>
+              <span className="px-2.5 py-1 rounded-lg bg-white/10 backdrop-blur-xs border border-white/15">
+                📞 1330 Korea Helpline
+              </span>
+            </div>
+          </div>
+
+          <div className="lg:col-span-4 flex flex-col gap-3">
+            {/* Direct Open Share Modal Button */}
+            {onOpenShareModal && (
+              <button
+                onClick={onOpenShareModal}
+                className="w-full py-3 px-5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg hover:scale-[1.02]"
+              >
+                <Share2 className="w-4 h-4" />
+                <span><Translate>Share & Invite Friends (WhatsApp, X, Reddit)</Translate></span>
+              </button>
+            )}
+
+            {/* Quick URL Copy Box with Feedback */}
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-2.5 flex items-center justify-between gap-2">
+              <span className="font-mono text-xs text-amber-200 truncate pl-2 select-all">
+                https://corea-labs.com
+              </span>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText("https://corea-labs.com");
+                  setCopiedUrl(true);
+                  setTimeout(() => setCopiedUrl(false), 2500);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white text-stone-900 text-xs font-semibold flex items-center gap-1.5 hover:bg-stone-100 transition-colors cursor-pointer shrink-0"
+              >
+                {copiedUrl ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span><Translate>Copied!</Translate></span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span><Translate>Copy Link</Translate></span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Mobile Scan QR trigger */}
+            {onOpenShareModal && (
+              <button
+                onClick={onOpenShareModal}
+                className="w-full py-2 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-stone-300 text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer border border-white/10"
+              >
+                <QrCode className="w-3.5 h-3.5 text-amber-300" />
+                <span><Translate>Show Phone QR Code for Group Scanning</Translate></span>
+              </button>
+            )}
+          </div>
+
         </div>
       </section>
     </div>
