@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ShieldCheck, Lock, X, KeyRound, AlertCircle, CheckCircle, RefreshCw } from "lucide-react";
+import { ShieldCheck, Lock, X, KeyRound, AlertCircle, CheckCircle, RefreshCw, BarChart3 } from "lucide-react";
 import { useAdmin } from "../context/AdminContext";
 import { Translate } from "../context/LanguageContext";
 
 export default function AdminLoginModal() {
-  const { showLoginModal, setShowLoginModal, login, changePassword, isAdmin, logout } = useAdmin();
+  const { showLoginModal, setShowLoginModal, login, changePassword, isAdmin, logout, setShowAnalyticsModal } = useAdmin();
   
   const [activeTab, setActiveTab] = useState<"login" | "changePassword">("login");
   const [password, setPassword] = useState("");
@@ -184,6 +184,18 @@ export default function AdminLoginModal() {
                   </div>
 
                   <div className="pt-2 flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleClose();
+                        setShowAnalyticsModal(true);
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-stone-950 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+                    >
+                      <BarChart3 className="w-4 h-4 text-stone-950" />
+                      <span><Translate>방문자 및 국가별 통계 대시보드 열기</Translate></span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => setActiveTab("changePassword")}

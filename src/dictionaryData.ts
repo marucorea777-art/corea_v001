@@ -179,6 +179,8 @@ export const UI_DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.": "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.",
     "공유 & 초대": "공유 & 초대",
     "공유 & 친구 초대": "공유 & 친구 초대",
+    "방문자 통계": "방문자 통계",
+    "방문자 및 국가별 통계 대시보드 열기": "방문자 및 국가별 통계 대시보드 열기",
   },
 
   en: {
@@ -359,6 +361,8 @@ export const UI_DICTIONARY: Record<LanguageCode, Record<string, string>> = {
     "실시간 매매기준율 환율 정보로 정확한 원화 가치를 계산합니다.": "Calculates exact KRW value using live foreign exchange benchmark rates.",
     "공유 & 초대": "Share & Invite",
     "공유 & 친구 초대": "Share with Friends",
+    "방문자 통계": "Visitor Stats",
+    "방문자 및 국가별 통계 대시보드 열기": "Open Visitor & Country Analytics",
   },
 
   ja: {

@@ -1,4 +1,4 @@
-import { useState, startTransition } from "react";
+import { useState, useEffect, startTransition } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import Navbar from "./components/Navbar";
 import HomeView from "./components/HomeView";
@@ -7,16 +7,24 @@ import CultureView from "./components/CultureView";
 import PlacesView from "./components/PlacesView";
 import FestivalsView from "./components/FestivalsView";
 import TravelView from "./components/TravelView";
-import { LanguageProvider, Translate } from "./context/LanguageContext";
+import { LanguageProvider, Translate, useTranslation } from "./context/LanguageContext";
 import { AdminProvider, useAdmin } from "./context/AdminContext";
 import AdminLoginModal from "./components/AdminLoginModal";
+import AdminAnalyticsDashboard from "./components/AdminAnalyticsDashboard";
 import GlobalShareModal from "./components/GlobalShareModal";
 import KoreaLogoIcon from "./components/KoreaLogoIcon";
+import { trackPageView } from "./services/analytics";
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState<string>("home");
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
-  const { isAdmin, setShowLoginModal, logout } = useAdmin();
+  const { language } = useTranslation();
+  const { isAdmin, setShowLoginModal, logout, showAnalyticsModal, setShowAnalyticsModal } = useAdmin();
+
+  // Track page views and language selections
+  useEffect(() => {
+    trackPageView(activeTab, language);
+  }, [activeTab, language]);
 
   const handleSetTab = (tab: string) => {
     startTransition(() => {
@@ -96,12 +104,20 @@ function MainApp() {
             </button>
             <span className="text-stone-300">|</span>
             {isAdmin ? (
-              <button 
-                onClick={logout} 
-                className="text-amber-700 hover:text-red-600 transition-colors cursor-pointer font-semibold"
-              >
-                <Translate>관리자 로그아웃</Translate>
-              </button>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setShowAnalyticsModal(true)} 
+                  className="text-amber-700 hover:text-amber-900 transition-colors cursor-pointer font-bold flex items-center gap-1"
+                >
+                  <span>📊</span> <Translate>방문자 통계</Translate>
+                </button>
+                <button 
+                  onClick={logout} 
+                  className="text-stone-400 hover:text-red-600 transition-colors cursor-pointer"
+                >
+                  <Translate>관리자 로그아웃</Translate>
+                </button>
+              </div>
             ) : (
               <button 
                 onClick={() => setShowLoginModal(true)} 
@@ -119,6 +135,12 @@ function MainApp() {
       <GlobalShareModal 
         isOpen={isShareModalOpen} 
         onClose={() => setIsShareModalOpen(false)} 
+      />
+
+      {/* Admin Analytics Dashboard */}
+      <AdminAnalyticsDashboard
+        isOpen={showAnalyticsModal}
+        onClose={() => setShowAnalyticsModal(false)}
       />
 
       {/* Global Admin Login Modal */}

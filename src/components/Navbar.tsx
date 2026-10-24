@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Compass, BookOpen, Utensils, MapPin, CalendarDays, PlaneLanding, ChevronDown, ShieldCheck, LogOut, Share2 } from "lucide-react";
+import { Compass, BookOpen, Utensils, MapPin, CalendarDays, PlaneLanding, ChevronDown, ShieldCheck, LogOut, Share2, BarChart3 } from "lucide-react";
 import { motion } from "motion/react";
 import { useTranslation, LANGUAGES, LanguageCode, Translate } from "../context/LanguageContext";
 import { useAdmin } from "../context/AdminContext";
@@ -13,7 +13,7 @@ interface NavbarProps {
 
 export default function Navbar({ activeTab, setActiveTab, onOpenShareModal }: NavbarProps) {
   const { language, setLanguage, t } = useTranslation();
-  const { isAdmin, logout, setShowLoginModal } = useAdmin();
+  const { isAdmin, logout, setShowLoginModal, setShowAnalyticsModal } = useAdmin();
   const [langOpen, setLangOpen] = useState(false);
 
   const navItems = [
@@ -122,18 +122,29 @@ export default function Navbar({ activeTab, setActiveTab, onOpenShareModal }: Na
               )}
             </div>
 
-            {/* Admin Access Indicator & Button */}
+            {/* Admin Access Indicator & Analytics Button */}
             {isAdmin ? (
-              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-900 px-3 py-1.5 rounded-full text-xs font-medium shadow-2xs">
-                <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                <span className="font-semibold text-[11px]"><Translate>관리자</Translate></span>
+              <div className="flex items-center gap-1.5">
                 <button
-                  onClick={logout}
-                  title="관리자 로그아웃"
-                  className="ml-1 text-stone-400 hover:text-red-600 transition-colors cursor-pointer"
+                  onClick={() => setShowAnalyticsModal(true)}
+                  title="방문자 수 및 국가별 통계 분석 대시보드"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-stone-950 font-bold rounded-full text-xs shadow-xs transition-all cursor-pointer hover:scale-[1.02]"
                 >
-                  <LogOut className="w-3 h-3" />
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span className="text-[11px] font-bold"><Translate>방문자 통계</Translate></span>
                 </button>
+
+                <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-900 px-2.5 py-1.5 rounded-full text-xs font-medium shadow-2xs">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                  <span className="font-semibold text-[11px]"><Translate>관리자</Translate></span>
+                  <button
+                    onClick={logout}
+                    title="관리자 로그아웃"
+                    className="ml-1 text-stone-400 hover:text-red-600 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             ) : (
               <button
@@ -166,6 +177,17 @@ export default function Navbar({ activeTab, setActiveTab, onOpenShareModal }: Na
         </button>
         
         <div className="flex items-center gap-1.5">
+          {/* Mobile Analytics Dashboard Button */}
+          {isAdmin && (
+            <button
+              onClick={() => setShowAnalyticsModal(true)}
+              className="p-1.5 rounded-full bg-amber-400 text-stone-950 cursor-pointer shadow-xs font-bold"
+              title="방문자 및 국가별 통계"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           {/* Mobile Share & Promote Button */}
           {onOpenShareModal && (
             <button

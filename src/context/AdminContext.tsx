@@ -8,6 +8,8 @@ interface AdminContextType {
   logout: () => void;
   showLoginModal: boolean;
   setShowLoginModal: (show: boolean) => void;
+  showAnalyticsModal: boolean;
+  setShowAnalyticsModal: (show: boolean) => void;
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
@@ -19,6 +21,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [adminToken, setAdminToken] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState<boolean>(false);
 
   useEffect(() => {
     // Check saved session
@@ -168,6 +171,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         logout,
         showLoginModal,
         setShowLoginModal,
+        showAnalyticsModal,
+        setShowAnalyticsModal,
       }}
     >
       {children}
