@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { STATIC_TRANSLATIONS } from "../dataTranslations";
 import { UI_DICTIONARY } from "../dictionaryData";
 
@@ -42,9 +42,15 @@ interface LanguageContextType {
   t: (key: string) => string;
   translateText: (text: string) => Promise<string>;
   translateBatch: (texts: string[]) => Promise<string[]>;
+  cacheVersion: number;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+
+// Helper to detect if a string contains Korean characters (Hangul)
+const containsKorean = (text: string): boolean => {
+  return /[\uac00-\ud7af]/u.test(text);
+};
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<LanguageCode>(() => {
@@ -58,11 +64,15 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
-    const saved = localStorage.getItem("corea_labs_lang");
-    return (saved as LanguageCode) || "en";
+    try {
+      const saved = localStorage.getItem("corea_labs_lang");
+      return (saved as LanguageCode) || "en";
+    } catch {
+      return "en";
+    }
   });
 
-  // Keep a persistent translation cache in state and localStorage
+  // Persistent translation cache for dynamic / background AI translations
   const [translationCache, setTranslationCache] = useState<Record<string, string>>(() => {
     try {
       const saved = localStorage.getItem(`corea_labs_cache_${language}`);
@@ -72,180 +82,189 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  // Update language and load its specific cache
-  const setLanguage = (lang: LanguageCode) => {
-    localStorage.setItem("corea_labs_lang", lang);
-    setLanguageState(lang);
+  const [cacheVersion, setCacheVersion] = useState<number>(0);
+
+  // Switch language and load its persisted cache
+  const setLanguage = useCallback((lang: LanguageCode) => {
     try {
+      localStorage.setItem("corea_labs_lang", lang);
       const saved = localStorage.getItem(`corea_labs_cache_${lang}`);
       setTranslationCache(saved ? JSON.parse(saved) : {});
     } catch {
       setTranslationCache({});
     }
-  };
+    setLanguageState(lang);
+    setCacheVersion(v => v + 1);
+  }, []);
 
-  // Helper to detect if a string contains Korean characters (Hangul)
-  const containsKorean = (text: string): boolean => {
-    return /[\uac00-\ud7af]/u.test(text);
-  };
+  // Background non-blocking translation queue
+  const pendingQueueRef = useRef<Set<string>>(new Set());
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Helper to resolve translation key
+  // Background processor: sends batches to /api/translate quietly without blocking UI
+  const processPendingBatch = useCallback(() => {
+    if (language === "en") return;
+    const itemsToFetch: string[] = [];
+
+    pendingQueueRef.current.forEach(text => {
+      if (!inFlightRef.current.has(text) && itemsToFetch.length < 35) {
+        itemsToFetch.push(text);
+        inFlightRef.current.add(text);
+        pendingQueueRef.current.delete(text);
+      }
+    });
+
+    if (itemsToFetch.length === 0) return;
+
+    const targetLangObj = LANGUAGES.find(l => l.code === language);
+    const targetLanguageName = targetLangObj ? targetLangObj.name : "English";
+
+    fetch("/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        texts: itemsToFetch,
+        targetLanguage: targetLanguageName
+      }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        const translations: string[] = data.translations || [];
+        let updatedCount = 0;
+        const newCache = { ...translationCache };
+
+        itemsToFetch.forEach((orig, idx) => {
+          const trans = translations[idx];
+          if (trans && trans !== orig) {
+            newCache[orig] = trans;
+            updatedCount++;
+          }
+        });
+
+        if (updatedCount > 0) {
+          setTranslationCache(newCache);
+          try {
+            localStorage.setItem(`corea_labs_cache_${language}`, JSON.stringify(newCache));
+          } catch {
+            // ignore
+          }
+          setCacheVersion(v => v + 1);
+        }
+      })
+      .catch(err => {
+        console.warn("Background AI translation error:", err);
+      })
+      .finally(() => {
+        // If there are more items, process next batch after a gentle pause
+        if (pendingQueueRef.current.size > 0) {
+          setTimeout(processPendingBatch, 600);
+        }
+      });
+  }, [language, translationCache]);
+
+  const queueBackgroundTranslation = useCallback((text: string) => {
+    if (!text || text.trim().length <= 1) return;
+    if (language === "en" || inFlightRef.current.has(text)) return;
+    if (translationCache[text]) return;
+
+    pendingQueueRef.current.add(text);
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
+      processPendingBatch();
+    }, 350);
+  }, [language, translationCache, processPendingBatch]);
+
+  // Instant dictionary translation lookup
   const t = useCallback((key: string): string => {
-    if (!key) return "";
+    if (!key || typeof key !== "string") return "";
+    const trimmed = key.trim();
+    if (!trimmed) return key;
 
-    // If language is Korean and key is already Korean, return as-is
+    // 1. If language is Korean and key contains Korean, return as-is
     if (language === "ko" && containsKorean(key)) {
       return key;
     }
 
-    // Look up in comprehensive UI dictionary
+    // 2. Look up in comprehensive UI dictionary
     const dict = UI_DICTIONARY[language];
-    if (dict && dict[key]) {
-      return dict[key];
+    if (dict) {
+      if (dict[key]) return dict[key];
+      if (dict[trimmed]) return dict[trimmed];
     }
 
-    // Look up in custom static translations
+    // 3. Look up in custom curated static translations
     const staticDict = STATIC_TRANSLATIONS[language];
-    if (staticDict && staticDict[key]) {
-      return staticDict[key];
+    if (staticDict) {
+      if (staticDict[key]) return staticDict[key];
+      if (staticDict[trimmed]) return staticDict[trimmed];
     }
 
-    // Look up in runtime cache
+    // 4. Look up in dynamic persistent translation cache
     if (translationCache[key]) {
       return translationCache[key];
     }
+    if (translationCache[trimmed]) {
+      return translationCache[trimmed];
+    }
 
-    // If language is English and key is English (no Korean), return as-is
+    // 5. If target language is English and text has no Korean, return as-is
     if (language === "en" && !containsKorean(key)) {
       return key;
     }
 
-    // Otherwise, return original key as fallback
-    return key;
-  }, [language, translationCache]);
-
-  // Queue for batching translation requests to the server to prevent rate limiting
-  const pendingRequestsRef = useRef<{
-    text: string;
-    resolve: (translated: string) => void;
-    reject: (err: any) => void;
-  }[]>([]);
-  const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const apiFallbackUntilRef = useRef<Record<string, number>>({});
-
-  // Consolidated batch translation fetcher with debounce
-  const queueTranslation = useCallback((text: string): Promise<string> => {
-    // If rate limit backoff is active for this language, fallback to static t(text)
-    if (apiFallbackUntilRef.current[language] && Date.now() < apiFallbackUntilRef.current[language]) {
-      return Promise.resolve(t(text));
+    // 6. If target language is Korean and key has an English translation in dict, check reverse
+    if (language === "ko" && !containsKorean(key)) {
+      // Key is in English, let's see if we can queue it for background translation
+      queueBackgroundTranslation(key);
+      return key;
     }
 
-    return new Promise<string>((resolve, reject) => {
-      pendingRequestsRef.current.push({ text, resolve, reject });
+    // 7. For other non-English languages, quietly queue for background AI translation
+    if (language !== "en") {
+      queueBackgroundTranslation(key);
+    }
 
-      if (batchTimerRef.current) {
-        clearTimeout(batchTimerRef.current);
-      }
+    // Return original key as instant fallback
+    return key;
+  }, [language, translationCache, queueBackgroundTranslation]);
 
-      batchTimerRef.current = setTimeout(async () => {
-        batchTimerRef.current = null;
-        const currentQueue = pendingRequestsRef.current;
-        pendingRequestsRef.current = [];
-
-        if (currentQueue.length === 0) return;
-
-        // Extract unique texts to translate
-        const uniqueTexts: string[] = Array.from(new Set(currentQueue.map(item => item.text))) as string[];
-        const targetLangObj = LANGUAGES.find(l => l.code === language);
-        const targetLanguageName = targetLangObj ? targetLangObj.name : "English";
-
-        try {
-          const response = await fetch("/api/translate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              texts: uniqueTexts,
-              targetLanguage: targetLanguageName
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error("Translation request failed");
-          }
-
-          const data = await response.json();
-          const translations: string[] = data.translations || [];
-          const hasError = !!data.error;
-          const quotaExceeded = !!data.quotaExceeded;
-
-          if (quotaExceeded || hasError) {
-            // Temporary 5-second backoff
-            apiFallbackUntilRef.current[language] = Date.now() + 5000;
-          }
-
-          // Map unique text to its translation
-          const translationMap: Record<string, string> = {};
-          uniqueTexts.forEach((originalText, idx) => {
-            translationMap[originalText] = translations[idx] || originalText;
-          });
-
-          // Update local cache in bulk
-          const newCache = { ...translationCache };
-          let cacheChanged = false;
-
-          if (!hasError) {
-            uniqueTexts.forEach(originalText => {
-              const translatedText = translationMap[originalText];
-              if (translatedText && translatedText !== originalText) {
-                newCache[originalText] = translatedText;
-                cacheChanged = true;
-              }
-            });
-            if (cacheChanged) {
-              setTranslationCache(newCache);
-              localStorage.setItem(`corea_labs_cache_${language}`, JSON.stringify(newCache));
-            }
-          }
-
-          // Resolve all pending items
-          currentQueue.forEach(item => {
-            item.resolve(translationMap[item.text] || item.text);
-          });
-        } catch (error) {
-          console.warn("Batch translation fetch failed. Falling back to static dictionary.", error);
-          // Set 5-second backoff
-          apiFallbackUntilRef.current[language] = Date.now() + 5000;
-          // Resolve with fallback
-          currentQueue.forEach(item => {
-            item.resolve(t(item.text));
-          });
-        }
-      }, 120); // 120ms debounce window
-    });
-  }, [language, translationCache, t]);
-
-  // Dynamic Single text translation helper (utilizes the debounced queue)
+  // Dynamic single text translation helper
   const translateText = useCallback(async (text: string): Promise<string> => {
     if (!text || !text.trim()) return text;
-    if (language === "ko" && containsKorean(text)) return text;
-    if (language === "en" && !containsKorean(text)) return text;
 
     const staticRes = t(text);
     if (staticRes && staticRes !== text) return staticRes;
 
-    return queueTranslation(text);
-  }, [language, queueTranslation, t]);
+    if (language === "ko" && containsKorean(text)) return text;
+    if (language === "en" && !containsKorean(text)) return text;
 
-  // Dynamic Batch translation helper (utilizes the debounced queue in parallel)
+    if (translationCache[text]) return translationCache[text];
+
+    return text;
+  }, [language, t, translationCache]);
+
+  // Batch translation helper
   const translateBatch = useCallback(async (texts: string[]): Promise<string[]> => {
-    if (texts.length === 0) {
-      return texts;
-    }
-    return Promise.all(texts.map(text => translateText(text)));
-  }, [translateText]);
+    if (!texts || texts.length === 0) return [];
+    return texts.map(text => t(text));
+  }, [t]);
+
+  const contextValue = useMemo(() => ({
+    language,
+    setLanguage,
+    t,
+    translateText,
+    translateBatch,
+    cacheVersion,
+  }), [language, setLanguage, t, translateText, translateBatch, cacheVersion]);
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t, translateText, translateBatch }}>
+    <LanguageContext.Provider value={contextValue}>
       {children}
     </LanguageContext.Provider>
   );
@@ -259,123 +278,101 @@ export function useTranslation() {
   return context;
 }
 
-// Higher-order Component to dynamically translate texts
+// Pure, instantaneous translation component (0ms overhead, no loading flickers)
 interface TranslateProps {
   children: string;
 }
 
 export function Translate({ children }: TranslateProps) {
-  const { language, t, translateText } = useTranslation();
-  const [translated, setTranslated] = useState<string>(() => t(children));
-  const [loading, setLoading] = useState<boolean>(false);
-
-  useEffect(() => {
-    const immediate = t(children);
-
-    const containsKorean = (text: string): boolean => {
-      return /[\uac00-\ud7af]/u.test(text);
-    };
-
-    const isTargetMatch = 
-      immediate !== children || 
-      (language === "ko" && containsKorean(children)) ||
-      (language === "en" && !containsKorean(children));
-
-    if (isTargetMatch) {
-      setTranslated(immediate);
-      setLoading(false);
-      return;
-    }
-
-    let isMounted = true;
-    setLoading(true);
-    
-    translateText(children).then(res => {
-      if (isMounted) {
-        setTranslated(res);
-        setLoading(false);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [children, language, t, translateText]);
-
-  if (loading) {
-    return (
-      <span className="animate-pulse bg-stone-200/60 rounded text-transparent select-none inline-block px-1">
-        {children}
-      </span>
-    );
+  const { t } = useTranslation();
+  if (typeof children !== "string") {
+    return <>{children}</>;
   }
-
-  return <>{translated}</>;
+  return <>{t(children)}</>;
 }
 
+// High-performance data translation hook with deep object & array translation
 export function useTranslatedData<T>(
   originalData: T,
   keysToTranslate: string[]
 ): { translatedData: T; loading: boolean } {
-  const { language, translateBatch } = useTranslation();
-  const [translatedData, setTranslatedData] = useState<T>(originalData);
-  const [loading, setLoading] = useState<boolean>(false);
+  const { language, t, cacheVersion } = useTranslation();
+  const keysKey = keysToTranslate.join(",");
 
-  useEffect(() => {
-    if (language === "en" || !originalData) {
-      setTranslatedData(originalData);
-      setLoading(false);
-      return;
-    }
+  const translatedData = useMemo(() => {
+    if (!originalData) return originalData;
 
-    let isMounted = true;
-    setLoading(true);
-
-    const dataArray = Array.isArray(originalData) ? originalData : [originalData];
-    const textsToTranslate: string[] = [];
-    const mapping: { itemIndex: number; key: string }[] = [];
-
-    dataArray.forEach((item, itemIndex) => {
-      keysToTranslate.forEach((key) => {
-        if (item && item[key] && typeof item[key] === "string") {
-          textsToTranslate.push(item[key]);
-          mapping.push({ itemIndex, key });
-        }
-      });
-    });
-
-    if (textsToTranslate.length === 0) {
-      setTranslatedData(originalData);
-      setLoading(false);
-      return;
-    }
-
-    translateBatch(textsToTranslate)
-      .then((translations) => {
-        if (!isMounted) return;
-
-        const newArray = dataArray.map((item) => ({ ...item }));
-        mapping.forEach((map, index) => {
-          if (newArray[map.itemIndex]) {
-            newArray[map.itemIndex][map.key] = translations[index];
+    // Helper to translate strings, string arrays, or nested objects
+    const translateValue = (val: any, fieldKey?: string): any => {
+      if (typeof val === "string") {
+        return t(val);
+      }
+      if (Array.isArray(val)) {
+        return val.map(item => {
+          if (typeof item === "string") {
+            return t(item);
           }
+          // Array of objects (like attractions [{ name, desc }], itinerary [{ activity, desc }])
+          if (item && typeof item === "object") {
+            const translatedSub: any = { ...item };
+            for (const subKey of Object.keys(translatedSub)) {
+              if (typeof translatedSub[subKey] === "string") {
+                translatedSub[subKey] = t(translatedSub[subKey]);
+              }
+            }
+            return translatedSub;
+          }
+          return item;
         });
-
-        setTranslatedData(Array.isArray(originalData) ? (newArray as unknown as T) : (newArray[0] as unknown as T));
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.warn("Translation failed for data, falling back to original", err);
-        if (isMounted) {
-          setTranslatedData(originalData);
-          setLoading(false);
+      }
+      // Nested objects (like travelTips: { bestTime, mustTry, hiddenGem })
+      if (val && typeof val === "object") {
+        const translatedObj: any = { ...val };
+        for (const subKey of Object.keys(translatedObj)) {
+          if (typeof translatedObj[subKey] === "string") {
+            translatedObj[subKey] = t(translatedObj[subKey]);
+          }
         }
-      });
-
-    return () => {
-      isMounted = false;
+        return translatedObj;
+      }
+      return val;
     };
-  }, [originalData, keysToTranslate, language, translateBatch]);
 
-  return { translatedData, loading };
+    const keys = keysKey.split(",");
+
+    if (Array.isArray(originalData)) {
+      return originalData.map((item) => {
+        if (!item || typeof item !== "object") return item;
+        const copy: any = { ...item };
+
+        for (const k of keys) {
+          if (k in copy && copy[k] !== undefined) {
+            // When target language is Korean and item has koreanName, prefer it for name/title
+            if (language === "ko" && (k === "name" || k === "title") && item.koreanName) {
+              copy[k] = item.koreanName;
+            } else {
+              copy[k] = translateValue(copy[k], k);
+            }
+          }
+        }
+        return copy;
+      }) as unknown as T;
+    } else if (typeof originalData === "object") {
+      const copy: any = { ...(originalData as any) };
+      for (const k of keys) {
+        if (k in copy && copy[k] !== undefined) {
+          if (language === "ko" && (k === "name" || k === "title") && (originalData as any).koreanName) {
+            copy[k] = (originalData as any).koreanName;
+          } else {
+            copy[k] = translateValue(copy[k], k);
+          }
+        }
+      }
+      return copy as T;
+    }
+
+    return originalData;
+  }, [originalData, keysKey, language, t, cacheVersion]);
+
+  return { translatedData, loading: false };
 }

@@ -52,7 +52,7 @@ Here is the JSON array of strings to translate:
 ${JSON.stringify(texts, null, 2)}`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           systemInstruction: "You only output valid JSON containing an array of strings under the key 'translations'. The length of the output array must exactly match the input array.",
