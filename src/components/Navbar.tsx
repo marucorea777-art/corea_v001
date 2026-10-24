@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Compass, BookOpen, Utensils, MapPin, CalendarDays, PlaneLanding, ChevronDown, ShieldCheck, LogOut, Share2, BarChart3 } from "lucide-react";
 import { motion } from "motion/react";
 import { useTranslation, LANGUAGES, LanguageCode, Translate } from "../context/LanguageContext";
@@ -15,6 +15,39 @@ export default function Navbar({ activeTab, setActiveTab, onOpenShareModal }: Na
   const { language, setLanguage, t } = useTranslation();
   const { isAdmin, logout, setShowLoginModal, setShowAnalyticsModal } = useAdmin();
   const [langOpen, setLangOpen] = useState(false);
+
+  // Real-time Seoul Live Clock (Asia/Seoul timezone, updated every second)
+  const [seoulTime, setSeoulTime] = useState<string>(() => {
+    try {
+      return new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Seoul",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      }).format(new Date());
+    } catch {
+      return "10:00:00 AM";
+    }
+  });
+
+  useEffect(() => {
+    const updateTime = () => {
+      try {
+        const formatted = new Intl.DateTimeFormat("en-US", {
+          timeZone: "Asia/Seoul",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true,
+        }).format(new Date());
+        setSeoulTime(formatted);
+      } catch {}
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const navItems = [
     { id: "home", label: "Corea", icon: Compass },
@@ -71,28 +104,28 @@ export default function Navbar({ activeTab, setActiveTab, onOpenShareModal }: Na
             })}
           </nav>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 shrink-0">
             {/* Global Promotion & Share Button */}
             {onOpenShareModal && (
               <button
                 onClick={onOpenShareModal}
                 title="Share corea-labs.com with travelers worldwide"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white transition-all text-xs font-semibold rounded-full cursor-pointer shadow-xs hover:scale-[1.02]"
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200/90 bg-white hover:bg-stone-50 text-stone-700 hover:text-stone-900 transition-colors text-xs font-medium rounded-full cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
               >
-                <Share2 className="w-3.5 h-3.5" />
-                <span className="text-[11px]"><Translate>공유 & 초대</Translate></span>
+                <Share2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span className="text-[11px] font-semibold whitespace-nowrap"><Translate>공유 & 초대</Translate></span>
               </button>
             )}
 
             {/* Premium Language Dropdown */}
-            <div className="relative">
+            <div className="relative shrink-0">
               <button 
                 onClick={() => setLangOpen(!langOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200/80 bg-white hover:bg-stone-50 transition-colors text-xs font-medium text-stone-700 rounded-full cursor-pointer shadow-2xs"
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200/80 bg-white hover:bg-stone-50 transition-colors text-xs font-medium text-stone-700 rounded-full cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
               >
-                <span>{currentLangObj?.flag}</span>
-                <span className="font-sans text-[11px] font-medium text-stone-800">{currentLangObj?.nativeName}</span>
-                <ChevronDown className={`w-3.5 h-3.5 text-stone-400 transition-transform duration-200 ${langOpen ? "rotate-180" : ""}`} />
+                <span className="shrink-0">{currentLangObj?.flag}</span>
+                <span className="font-sans text-[11px] font-medium text-stone-800 whitespace-nowrap">{currentLangObj?.nativeName}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-stone-400 transition-transform duration-200 shrink-0 ${langOpen ? "rotate-180" : ""}`} />
               </button>
               
               {langOpen && (
@@ -110,9 +143,9 @@ export default function Navbar({ activeTab, setActiveTab, onOpenShareModal }: Na
                           language === lang.code ? "bg-stone-50 font-semibold text-stone-900" : "text-stone-600"
                         }`}
                       >
-                        <span className="text-base">{lang.flag}</span>
+                        <span className="text-base shrink-0">{lang.flag}</span>
                         <div className="flex flex-col">
-                          <span className="font-medium leading-none">{lang.nativeName}</span>
+                          <span className="font-medium leading-none whitespace-nowrap">{lang.nativeName}</span>
                           <span className="text-[9px] text-stone-400 mt-0.5">{lang.name}</span>
                         </div>
                       </button>
@@ -122,25 +155,25 @@ export default function Navbar({ activeTab, setActiveTab, onOpenShareModal }: Na
               )}
             </div>
 
-            {/* Admin Access Indicator & Analytics Button */}
+            {/* Admin Controls Cluster (Visitor Stats & Admin Badge) */}
             {isAdmin ? (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center bg-amber-50/90 border border-amber-300/80 rounded-full p-0.5 shadow-2xs whitespace-nowrap shrink-0">
                 <button
                   onClick={() => setShowAnalyticsModal(true)}
-                  title="방문자 수 및 국가별 통계 분석 대시보드"
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-stone-950 font-bold rounded-full text-xs shadow-xs transition-all cursor-pointer hover:scale-[1.02]"
+                  title="방문자 수 및 국가별 통계 대시보드"
+                  className="flex items-center gap-1.5 px-3 py-1 bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold rounded-full text-[11px] shadow-xs transition-colors cursor-pointer whitespace-nowrap shrink-0"
                 >
-                  <BarChart3 className="w-3.5 h-3.5" />
-                  <span className="text-[11px] font-bold"><Translate>방문자 통계</Translate></span>
+                  <BarChart3 className="w-3.5 h-3.5 shrink-0" />
+                  <span className="whitespace-nowrap"><Translate>방문자 통계</Translate></span>
                 </button>
 
-                <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-900 px-2.5 py-1.5 rounded-full text-xs font-medium shadow-2xs">
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                  <span className="font-semibold text-[11px]"><Translate>관리자</Translate></span>
+                <div className="flex items-center gap-1 px-2.5 py-1 text-amber-900 text-[11px] font-semibold whitespace-nowrap shrink-0">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span className="whitespace-nowrap"><Translate>관리자</Translate></span>
                   <button
                     onClick={logout}
                     title="관리자 로그아웃"
-                    className="ml-1 text-stone-400 hover:text-red-600 transition-colors cursor-pointer"
+                    className="ml-0.5 text-amber-700/60 hover:text-red-600 transition-colors cursor-pointer p-0.5 rounded-full hover:bg-amber-100 shrink-0"
                   >
                     <LogOut className="w-3 h-3" />
                   </button>
@@ -150,17 +183,20 @@ export default function Navbar({ activeTab, setActiveTab, onOpenShareModal }: Na
               <button
                 onClick={() => setShowLoginModal(true)}
                 title="관리자 로그인 (명소/축제 관리)"
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200/80 bg-white hover:bg-stone-50 transition-colors text-xs font-medium text-stone-600 hover:text-stone-900 rounded-full cursor-pointer shadow-2xs"
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200/80 bg-white hover:bg-stone-50 transition-colors text-xs font-medium text-stone-600 hover:text-stone-900 rounded-full cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
               >
-                <ShieldCheck className="w-3.5 h-3.5 text-stone-400" />
-                <span className="text-[11px]"><Translate>관리자</Translate></span>
+                <ShieldCheck className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                <span className="text-[11px] whitespace-nowrap"><Translate>관리자</Translate></span>
               </button>
             )}
 
-            {/* Live Clock / Status */}
-            <div className="flex items-center gap-2 text-stone-500 font-mono text-[10px] border border-stone-200 bg-stone-50 px-3 py-1.5 rounded-full shadow-2xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              SEOUL 10:00 AM
+            {/* Real-time Live Seoul Clock */}
+            <div 
+              className="flex items-center gap-2 text-stone-600 font-mono text-[10px] border border-stone-200 bg-stone-50/90 px-3 py-1.5 rounded-full shadow-2xs whitespace-nowrap shrink-0"
+              title="대한민국 서울 실시간 시각 (KST, UTC+9)"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="font-semibold whitespace-nowrap">SEOUL {seoulTime}</span>
             </div>
           </div>
         </div>

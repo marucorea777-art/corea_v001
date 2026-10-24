@@ -184,8 +184,15 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                 </p>
               </div>
             ) : !stats ? (
-              <div className="py-20 text-center text-stone-500 text-xs">
-                <Translate>통계 데이터를 불러오지 못했습니다.</Translate>
+              <div className="py-20 flex flex-col items-center justify-center space-y-3 text-stone-500 text-xs">
+                <p><Translate>통계 데이터를 불러오는 중 지연이 발생했습니다.</Translate></p>
+                <button
+                  onClick={() => loadData(true)}
+                  className="px-4 py-2 bg-stone-900 text-white rounded-xl text-xs font-semibold hover:bg-stone-800 transition-colors cursor-pointer flex items-center gap-2"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span><Translate>통계 다시 불러오기</Translate></span>
+                </button>
               </div>
             ) : (
               <>
