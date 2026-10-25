@@ -20,8 +20,8 @@ export default function CultureView() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
   // Dynamic Translation of static content
-  const { translatedData: translatedCategories } = useTranslatedData(CULTURE_CATEGORIES, ["title", "intro"]);
-  const { translatedData: translatedItems } = useTranslatedData(CULTURE_ITEMS, ["title", "details", "highlights", "tips"]);
+  const { translatedData: translatedCategories } = useTranslatedData(CULTURE_CATEGORIES, ["title", "subtitle", "intro"]);
+  const { translatedData: translatedItems } = useTranslatedData(CULTURE_ITEMS, ["title", "summary", "details", "highlights", "tips"]);
   const { translatedData: translatedConcepts } = useTranslatedData(HANGUL_CONCEPTS, ["meaning", "poeticDescription"]);
   const { translatedData: translatedStyles } = useTranslatedData(CARD_STYLES, ["name"]);
 

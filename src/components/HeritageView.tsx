@@ -23,7 +23,9 @@ export default function HeritageView() {
   const { translatedData: translatedHeritage, loading: loadingHeritage } = useTranslatedData(HERITAGE_ITEMS, [
     "name",
     "description",
-    "keyHighlight"
+    "keyHighlight",
+    "period",
+    "category"
   ]);
 
   const { translatedData: translatedTimeline, loading: loadingTimeline } = useTranslatedData(TIMELINE, [

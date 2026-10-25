@@ -6,11 +6,16 @@ const STORAGE_DELETED_DESTINATIONS = "corea_labs_deleted_destinations";
 const STORAGE_FESTIVALS = "corea_labs_custom_festivals";
 const STORAGE_DELETED_FESTIVALS = "corea_labs_deleted_festivals";
 
+function isJsonResponse(res: Response): boolean {
+  const ct = res.headers.get("content-type");
+  return Boolean(ct && ct.includes("application/json"));
+}
+
 // --- Postcards ---
 export async function getPostcards(): Promise<PostcardLog[]> {
   try {
     const res = await fetch("/api/postcards");
-    if (res.ok) {
+    if (res.ok && isJsonResponse(res)) {
       const data = await res.json();
       if (Array.isArray(data)) {
         localStorage.setItem(STORAGE_POSTCARDS, JSON.stringify(data));
@@ -38,7 +43,7 @@ export async function addPostcard(card: Omit<PostcardLog, "id" | "createdAt">): 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newCard),
     });
-    if (res.ok) {
+    if (res.ok && isJsonResponse(res)) {
       const data = await res.json();
       if (data && data.id) {
         // Update local storage
@@ -85,7 +90,7 @@ export async function deletePostcard(id: string, token?: string | null): Promise
 export async function getCustomDestinations(): Promise<Destination[]> {
   try {
     const res = await fetch("/api/destinations");
-    if (res.ok) {
+    if (res.ok && isJsonResponse(res)) {
       const data = await res.json();
       if (Array.isArray(data)) {
         localStorage.setItem(STORAGE_DESTINATIONS, JSON.stringify(data));
@@ -119,7 +124,7 @@ export async function addDestination(dest: Destination, token?: string | null): 
       },
       body: JSON.stringify(newDest),
     });
-    if (res.ok) {
+    if (res.ok && isJsonResponse(res)) {
       const data = await res.json();
       if (data && data.id) {
         const local = localStorage.getItem(STORAGE_DESTINATIONS);
@@ -174,7 +179,7 @@ export async function deleteDestination(id: string, token?: string | null): Prom
 export async function getCustomFestivals(): Promise<Festival[]> {
   try {
     const res = await fetch("/api/festivals");
-    if (res.ok) {
+    if (res.ok && isJsonResponse(res)) {
       const data = await res.json();
       if (Array.isArray(data)) {
         localStorage.setItem(STORAGE_FESTIVALS, JSON.stringify(data));
@@ -208,7 +213,7 @@ export async function addFestival(festival: Festival, token?: string | null): Pr
       },
       body: JSON.stringify(newFest),
     });
-    if (res.ok) {
+    if (res.ok && isJsonResponse(res)) {
       const data = await res.json();
       if (data && data.id) {
         const local = localStorage.getItem(STORAGE_FESTIVALS);
@@ -246,7 +251,7 @@ export async function updateFestival(festival: Festival, token?: string | null):
       },
       body: JSON.stringify(festival),
     });
-    if (res.ok) {
+    if (res.ok && isJsonResponse(res)) {
       const data = await res.json();
       if (data && data.id) {
         const local = localStorage.getItem(STORAGE_FESTIVALS);

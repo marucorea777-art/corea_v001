@@ -213,6 +213,10 @@ export async function fetchAnalyticsStats(): Promise<AnalyticsStatsResponse> {
   try {
     const res = await fetch("/api/analytics/stats");
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const ct = res.headers.get("content-type");
+    if (!ct || !ct.includes("application/json")) {
+      throw new Error("Server returned non-JSON response");
+    }
     const data: AnalyticsStatsResponse = await res.json();
     if (data && data.summary) {
       try {

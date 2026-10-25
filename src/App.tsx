@@ -14,6 +14,7 @@ import AdminAnalyticsDashboard from "./components/AdminAnalyticsDashboard";
 import GlobalShareModal from "./components/GlobalShareModal";
 import KoreaLogoIcon from "./components/KoreaLogoIcon";
 import { trackPageView } from "./services/analytics";
+import { ShieldCheck, BarChart3, LogOut } from "lucide-react";
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState<string>("home");
@@ -104,25 +105,32 @@ function MainApp() {
             </button>
             <span className="text-stone-300">|</span>
             {isAdmin ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-amber-50/90 border border-amber-300/80 px-2.5 py-1 rounded-full text-xs">
                 <button 
                   onClick={() => setShowAnalyticsModal(true)} 
-                  className="text-amber-700 hover:text-amber-900 transition-colors cursor-pointer font-bold flex items-center gap-1"
+                  className="text-amber-900 hover:text-amber-950 transition-colors cursor-pointer font-bold flex items-center gap-1.5"
+                  title="방문자 수 및 국가별 통계"
                 >
-                  <span>📊</span> <Translate>방문자 통계</Translate>
+                  <BarChart3 className="w-3.5 h-3.5 text-amber-600" />
+                  <Translate>방문자 통계</Translate>
                 </button>
+                <span className="text-amber-300">|</span>
                 <button 
                   onClick={logout} 
-                  className="text-stone-400 hover:text-red-600 transition-colors cursor-pointer"
+                  className="text-stone-500 hover:text-red-600 transition-colors cursor-pointer flex items-center gap-1"
+                  title="관리자 로그아웃"
                 >
+                  <LogOut className="w-3 h-3" />
                   <Translate>관리자 로그아웃</Translate>
                 </button>
               </div>
             ) : (
               <button 
                 onClick={() => setShowLoginModal(true)} 
-                className="text-stone-400 hover:text-stone-800 transition-colors cursor-pointer font-normal"
+                className="inline-flex items-center gap-1.5 text-stone-500 hover:text-stone-900 transition-colors cursor-pointer text-xs px-2.5 py-1 rounded-full hover:bg-stone-100 border border-stone-200/80 bg-stone-50"
+                title="관리자 로그인 (명소/축제 등록 및 통계)"
               >
+                <ShieldCheck className="w-3.5 h-3.5 text-stone-400" />
                 <Translate>관리자 로그인</Translate>
               </button>
             )}

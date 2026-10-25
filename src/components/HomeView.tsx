@@ -19,9 +19,9 @@ export default function HomeView({ setActiveTab, onOpenShareModal }: HomeViewPro
   const [quizSubmitted, setQuizSubmitted] = useState(false);
 
   // Dynamic Translation of core highlight spots
-  const { translatedData: translatedFestivals } = useTranslatedData(FESTIVALS, ["name", "description"]);
-  const { translatedData: translatedDestinations } = useTranslatedData(DESTINATIONS, ["name", "description"]);
-  const { translatedData: translatedHeritage } = useTranslatedData(HERITAGE_ITEMS, ["name", "description"]);
+  const { translatedData: translatedFestivals } = useTranslatedData(FESTIVALS, ["name", "description", "location", "dateRange", "season", "highlight", "features"]);
+  const { translatedData: translatedDestinations } = useTranslatedData(DESTINATIONS, ["name", "tagline", "description", "highlights", "locationLabel"]);
+  const { translatedData: translatedHeritage } = useTranslatedData(HERITAGE_ITEMS, ["name", "description", "period", "keyHighlight", "category"]);
   const { translatedData: translatedConcepts } = useTranslatedData(HANGUL_CONCEPTS, ["meaning", "poeticDescription"]);
 
   const highlightFestival = translatedFestivals[0] || FESTIVALS[0]; 
@@ -198,13 +198,13 @@ export default function HomeView({ setActiveTab, onOpenShareModal }: HomeViewPro
           <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl" />
           <div className="space-y-4">
             <span className="text-[10px] font-mono tracking-widest text-amber-400 uppercase"><Translate>Artifact Spotlight</Translate></span>
-            <h4 className="text-lg font-display font-semibold tracking-tight">{highlightHeritage.name}</h4>
+            <h4 className="text-lg font-display font-semibold tracking-tight">{t(highlightHeritage.name)}</h4>
             <p className="text-xs text-stone-300 font-sans leading-relaxed line-clamp-4">
-              {highlightHeritage.description}
+              {t(highlightHeritage.description)}
             </p>
           </div>
           <div className="pt-6 border-t border-stone-800 flex items-center justify-between">
-            <span className="text-[10px] text-stone-400 font-mono">{highlightHeritage.period}</span>
+            <span className="text-[10px] text-stone-400 font-mono">{t(highlightHeritage.period)}</span>
             <button 
               onClick={() => setActiveTab("heritage")}
               className="text-xs text-amber-300 font-semibold hover:underline flex items-center gap-0.5 cursor-pointer"
@@ -299,12 +299,12 @@ export default function HomeView({ setActiveTab, onOpenShareModal }: HomeViewPro
               <span className="text-4xl font-display font-bold text-stone-900">{HANGUL_CONCEPTS[0].hangul}</span>
               <span className="text-sm font-mono text-stone-500">[{HANGUL_CONCEPTS[0].romanization}]</span>
               <span className="text-xs font-medium text-amber-700 bg-amber-100/50 px-2 py-0.5 rounded-full border border-amber-200/30">
-                {wordConcept.meaning}
+                {t(wordConcept.meaning)}
               </span>
             </div>
 
             <p className="text-xs text-stone-600 leading-relaxed font-sans">
-              {wordConcept.poeticDescription}
+              {t(wordConcept.poeticDescription)}
             </p>
           </div>
 
@@ -343,14 +343,14 @@ export default function HomeView({ setActiveTab, onOpenShareModal }: HomeViewPro
               <h4 className="text-base font-display font-bold text-stone-900 flex items-center gap-1.5">
                 {language === "ko" ? (
                   <>
-                    <span>{highlightPlace.koreanName || highlightPlace.name}</span>
+                    <span>{highlightPlace.koreanName || t(highlightPlace.name)}</span>
                     {highlightPlace.name && highlightPlace.name !== highlightPlace.koreanName && (
                       <span className="text-xs font-sans text-stone-400 font-normal">({highlightPlace.name})</span>
                     )}
                   </>
                 ) : (
                   <>
-                    <span><Translate>{highlightPlace.name}</Translate></span>
+                    <span>{t(highlightPlace.name)}</span>
                     {highlightPlace.koreanName && (
                       <span className="text-xs font-sans text-stone-400 font-normal">({highlightPlace.koreanName})</span>
                     )}
@@ -358,7 +358,7 @@ export default function HomeView({ setActiveTab, onOpenShareModal }: HomeViewPro
                 )}
               </h4>
               <p className="text-xs text-stone-500 line-clamp-3 leading-relaxed">
-                <Translate>{highlightPlace.description}</Translate>
+                {t(highlightPlace.description)}
               </p>
             </div>
             <button
@@ -381,7 +381,7 @@ export default function HomeView({ setActiveTab, onOpenShareModal }: HomeViewPro
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
             <span className="absolute bottom-2 left-2 text-[9px] font-mono text-white bg-amber-600 px-2 py-0.5 rounded-full font-bold">
-              <Translate>{highlightFestival.season.toUpperCase()}</Translate>
+              <Translate>{highlightFestival.season}</Translate>
             </span>
           </div>
           <div className="p-5 md:w-3/5 flex flex-col justify-between space-y-4">
@@ -390,14 +390,14 @@ export default function HomeView({ setActiveTab, onOpenShareModal }: HomeViewPro
               <h4 className="text-base font-display font-bold text-stone-900 flex items-center gap-1.5">
                 {language === "ko" ? (
                   <>
-                    <span>{highlightFestival.koreanName || highlightFestival.name}</span>
+                    <span>{highlightFestival.koreanName || t(highlightFestival.name)}</span>
                     {highlightFestival.name && highlightFestival.name !== highlightFestival.koreanName && (
                       <span className="text-xs font-sans text-stone-400 font-normal">({highlightFestival.name})</span>
                     )}
                   </>
                 ) : (
                   <>
-                    <span><Translate>{highlightFestival.name}</Translate></span>
+                    <span>{t(highlightFestival.name)}</span>
                     {highlightFestival.koreanName && (
                       <span className="text-xs font-sans text-stone-400 font-normal">({highlightFestival.koreanName})</span>
                     )}
@@ -405,7 +405,7 @@ export default function HomeView({ setActiveTab, onOpenShareModal }: HomeViewPro
                 )}
               </h4>
               <p className="text-xs text-stone-500 line-clamp-3 leading-relaxed">
-                <Translate>{highlightFestival.description}</Translate>
+                {t(highlightFestival.description)}
               </p>
             </div>
             <button

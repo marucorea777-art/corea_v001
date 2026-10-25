@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { Compass, BookOpen, Utensils, MapPin, CalendarDays, PlaneLanding, ChevronDown, ShieldCheck, LogOut, Share2, BarChart3 } from "lucide-react";
+import { Compass, BookOpen, Utensils, MapPin, CalendarDays, PlaneLanding, ChevronDown, Share2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useTranslation, LANGUAGES, LanguageCode, Translate } from "../context/LanguageContext";
-import { useAdmin } from "../context/AdminContext";
 import KoreaLogoIcon from "./KoreaLogoIcon";
 
 interface NavbarProps {
@@ -13,7 +12,6 @@ interface NavbarProps {
 
 export default function Navbar({ activeTab, setActiveTab, onOpenShareModal }: NavbarProps) {
   const { language, setLanguage, t } = useTranslation();
-  const { isAdmin, logout, setShowLoginModal, setShowAnalyticsModal } = useAdmin();
   const [langOpen, setLangOpen] = useState(false);
 
   // Real-time Seoul Live Clock (Asia/Seoul timezone, updated every second)
@@ -155,41 +153,6 @@ export default function Navbar({ activeTab, setActiveTab, onOpenShareModal }: Na
               )}
             </div>
 
-            {/* Admin Controls Cluster (Visitor Stats & Admin Badge) */}
-            {isAdmin ? (
-              <div className="flex items-center bg-amber-50/90 border border-amber-300/80 rounded-full p-0.5 shadow-2xs whitespace-nowrap shrink-0">
-                <button
-                  onClick={() => setShowAnalyticsModal(true)}
-                  title="방문자 수 및 국가별 통계 대시보드"
-                  className="flex items-center gap-1.5 px-3 py-1 bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold rounded-full text-[11px] shadow-xs transition-colors cursor-pointer whitespace-nowrap shrink-0"
-                >
-                  <BarChart3 className="w-3.5 h-3.5 shrink-0" />
-                  <span className="whitespace-nowrap"><Translate>방문자 통계</Translate></span>
-                </button>
-
-                <div className="flex items-center gap-1 px-2.5 py-1 text-amber-900 text-[11px] font-semibold whitespace-nowrap shrink-0">
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  <span className="whitespace-nowrap"><Translate>관리자</Translate></span>
-                  <button
-                    onClick={logout}
-                    title="관리자 로그아웃"
-                    className="ml-0.5 text-amber-700/60 hover:text-red-600 transition-colors cursor-pointer p-0.5 rounded-full hover:bg-amber-100 shrink-0"
-                  >
-                    <LogOut className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowLoginModal(true)}
-                title="관리자 로그인 (명소/축제 관리)"
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200/80 bg-white hover:bg-stone-50 transition-colors text-xs font-medium text-stone-600 hover:text-stone-900 rounded-full cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                <span className="text-[11px] whitespace-nowrap"><Translate>관리자</Translate></span>
-              </button>
-            )}
-
             {/* Real-time Live Seoul Clock */}
             <div 
               className="flex items-center gap-2 text-stone-600 font-mono text-[10px] border border-stone-200 bg-stone-50/90 px-3 py-1.5 rounded-full shadow-2xs whitespace-nowrap shrink-0"
@@ -213,17 +176,6 @@ export default function Navbar({ activeTab, setActiveTab, onOpenShareModal }: Na
         </button>
         
         <div className="flex items-center gap-1.5">
-          {/* Mobile Analytics Dashboard Button */}
-          {isAdmin && (
-            <button
-              onClick={() => setShowAnalyticsModal(true)}
-              className="p-1.5 rounded-full bg-amber-400 text-stone-950 cursor-pointer shadow-xs font-bold"
-              title="방문자 및 국가별 통계"
-            >
-              <BarChart3 className="w-3.5 h-3.5" />
-            </button>
-          )}
-
           {/* Mobile Share & Promote Button */}
           {onOpenShareModal && (
             <button
@@ -232,25 +184,6 @@ export default function Navbar({ activeTab, setActiveTab, onOpenShareModal }: Na
               title="Share corea-labs.com"
             >
               <Share2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          {/* Mobile Admin Button */}
-          {isAdmin ? (
-            <button
-              onClick={() => setShowLoginModal(true)}
-              className="p-1.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 cursor-pointer"
-              title="관리자 모드 활성"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowLoginModal(true)}
-              className="p-1.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200 cursor-pointer"
-              title="관리자 로그인"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-stone-400" />
             </button>
           )}
 
