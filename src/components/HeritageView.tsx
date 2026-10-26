@@ -95,11 +95,11 @@ export default function HeritageView() {
               <div className="p-4 flex-1 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-1.5 justify-between">
-                    <h3 className="font-display font-bold text-stone-900 text-sm">{palace.name}</h3>
+                    <h3 className="font-display font-bold text-stone-900 text-sm">{t(palace.name)}</h3>
                     <span className="text-xs text-stone-400 font-medium font-sans">{palace.koreanName}</span>
                   </div>
                   <p className="text-[11px] text-stone-500 font-sans mt-1 line-clamp-3 leading-relaxed">
-                    {palace.description}
+                    {t(palace.description)}
                   </p>
                 </div>
                 
@@ -170,13 +170,13 @@ export default function HeritageView() {
                 <div className="p-5 md:w-3/5 flex flex-col justify-between space-y-4">
                   <div className="space-y-1">
                     <span className="text-[10px] text-stone-400 font-mono tracking-wide">{item.period}</span>
-                    <h3 className="font-display font-bold text-stone-900 text-base">{item.name}</h3>
-                    <p className="text-xs text-stone-500 leading-relaxed font-sans">{item.description}</p>
+                    <h3 className="font-display font-bold text-stone-900 text-base">{t(item.name)}</h3>
+                    <p className="text-xs text-stone-500 leading-relaxed font-sans">{t(item.description)}</p>
                   </div>
                   
                   <div className="pt-3 border-t border-stone-100/80 flex items-center justify-between text-[10px] font-mono text-stone-600 bg-stone-50 p-2.5 rounded-lg border border-stone-100">
                     <span className="font-semibold text-stone-900 uppercase"><Translate>Core Highlight</Translate>:</span>
-                    <span className="font-medium text-right text-stone-700">{item.keyHighlight}</span>
+                    <span className="font-medium text-right text-stone-700">{t(item.keyHighlight)}</span>
                   </div>
                 </div>
               </motion.div>
@@ -252,12 +252,12 @@ export default function HeritageView() {
                     <div className="p-6 md:w-3/5 flex flex-col justify-between space-y-4">
                       <div className="space-y-2">
                         <span className="text-[10px] text-amber-400 font-mono tracking-wider"><Translate>Dynasty Profile</Translate></span>
-                        <h3 className="font-display font-bold text-lg md:text-xl text-white">{item.title}</h3>
+                        <h3 className="font-display font-bold text-lg md:text-xl text-white">{t(item.title)}</h3>
                         <p className="text-xs text-amber-200/90 font-medium font-sans leading-relaxed">
-                          "{item.summary}"
+                          "{t(item.summary)}"
                         </p>
                         <p className="text-xs text-stone-300 font-sans leading-relaxed mt-2">
-                          {item.details}
+                          {t(item.details)}
                         </p>
                       </div>
 

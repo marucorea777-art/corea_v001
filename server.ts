@@ -311,29 +311,37 @@ ${JSON.stringify(texts, null, 2)}`;
     "Australia/Melbourne": { code: "AU", name: "Australia", flag: "🇦🇺" },
   };
 
-  function getDefaultAnalytics() {
-    const today = new Date().toISOString().split("T")[0];
-    const dates = [];
-    for (let i = 6; i >= 0; i--) {
+  function getDatesLastNDays(n: number = 14): string[] {
+    const dates: string[] = [];
+    for (let i = n - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       dates.push(d.toISOString().split("T")[0]);
     }
+    return dates;
+  }
+
+  function getDefaultAnalytics() {
+    const today = new Date().toISOString().split("T")[0];
+    const dates = getDatesLastNDays(14);
 
     const dailyStats: Record<string, number> = {};
-    const baseCounts = [385, 412, 398, 445, 480, 520, 432];
+    const baseCounts = [310, 335, 360, 380, 410, 395, 420, 385, 412, 398, 445, 480, 520, 433];
     dates.forEach((dateStr, idx) => {
       dailyStats[dateStr] = baseCounts[idx] || 400;
     });
 
     return {
-      totalVisits: 14820,
-      uniqueVisitorsCount: 11290,
-      uniqueSessionIds: {},
+      isPureRealOnly: false,
+      totalVisits: 14821,
+      uniqueVisitorsCount: 11291,
+      uniqueSessionIds: {
+        sess_init_admin: true,
+      },
       todayDate: today,
       dailyStats,
       countryStats: {
-        US: { code: "US", name: "United States", flag: "🇺🇸", count: 4820 },
+        US: { code: "US", name: "United States", flag: "🇺🇸", count: 4821 },
         JP: { code: "JP", name: "Japan", flag: "🇯🇵", count: 2750 },
         CN: { code: "CN", name: "China", flag: "🇨🇳", count: 2120 },
         TW: { code: "TW", name: "Taiwan", flag: "🇹🇼", count: 1180 },
@@ -349,7 +357,7 @@ ${JSON.stringify(texts, null, 2)}`;
         OTHER: { code: "OTHER", name: "Other Countries", flag: "🌐", count: 190 },
       },
       languageStats: {
-        en: { code: "en", name: "English (영어)", count: 8450 },
+        en: { code: "en", name: "English (영어)", count: 8451 },
         ja: { code: "ja", name: "Japanese (일본어)", count: 2420 },
         zh: { code: "zh", name: "Chinese (중국어)", count: 1980 },
         ko: { code: "ko", name: "Korean (한국어)", count: 680 },
@@ -360,7 +368,7 @@ ${JSON.stringify(texts, null, 2)}`;
         other: { code: "other", name: "Others (기타 언어)", count: 150 },
       },
       pageStats: {
-        festivals: { path: "festivals", name: "전국 축제 (Festivals)", count: 6240 },
+        festivals: { path: "festivals", name: "전국 축제 (Festivals)", count: 6241 },
         travel: { path: "travel", name: "입국 & 환전 가이드 (Travel Guide)", count: 3710 },
         places: { path: "places", name: "추천 명소 (Places)", count: 2460 },
         heritage: { path: "heritage", name: "왕실 문화유산 (Heritage)", count: 1380 },
@@ -368,7 +376,7 @@ ${JSON.stringify(texts, null, 2)}`;
         home: { path: "home", name: "홈 & 코리아 랩스 (Home)", count: 410 },
       },
       deviceStats: {
-        mobile: { name: "모바일 (Mobile)", count: 10078 },
+        mobile: { name: "모바일 (Mobile)", count: 10079 },
         desktop: { name: "데스크톱 (Desktop)", count: 4150 },
         tablet: { name: "태블릿 (Tablet)", count: 592 },
       },
@@ -381,15 +389,39 @@ ${JSON.stringify(texts, null, 2)}`;
         "LINE / Others": { name: "LINE 메신저 및 기타", count: 593 },
       },
       recentVisitors: [
-        { id: "v_1", timestamp: new Date(Date.now() - 1000 * 45).toISOString(), country: "United States", flag: "🇺🇸", code: "US", path: "festivals", device: "mobile", language: "en" },
-        { id: "v_2", timestamp: new Date(Date.now() - 1000 * 120).toISOString(), country: "Japan", flag: "🇯🇵", code: "JP", path: "places", device: "desktop", language: "ja" },
-        { id: "v_3", timestamp: new Date(Date.now() - 1000 * 240).toISOString(), country: "France", flag: "🇫🇷", code: "FR", path: "travel", device: "mobile", language: "fr" },
-        { id: "v_4", timestamp: new Date(Date.now() - 1000 * 380).toISOString(), country: "United Kingdom", flag: "🇬🇧", code: "GB", path: "festivals", device: "desktop", language: "en" },
-        { id: "v_5", timestamp: new Date(Date.now() - 1000 * 520).toISOString(), country: "Taiwan", flag: "🇹🇼", code: "TW", path: "heritage", device: "mobile", language: "zh" },
-        { id: "v_6", timestamp: new Date(Date.now() - 1000 * 680).toISOString(), country: "Germany", flag: "🇩🇪", code: "DE", path: "places", device: "mobile", language: "en" },
-        { id: "v_7", timestamp: new Date(Date.now() - 1000 * 850).toISOString(), country: "Thailand", flag: "🇹🇭", code: "TH", path: "travel", device: "mobile", language: "th" },
-        { id: "v_8", timestamp: new Date(Date.now() - 1000 * 1100).toISOString(), country: "Australia", flag: "🇦🇺", code: "AU", path: "festivals", device: "desktop", language: "en" },
+        { id: "v_1", timestamp: new Date(Date.now() - 1000 * 45).toISOString(), country: "United States", flag: "🇺🇸", code: "US", path: "festivals", device: "mobile", language: "en", referrer: "direct" },
+        { id: "v_2", timestamp: new Date(Date.now() - 1000 * 120).toISOString(), country: "Japan", flag: "🇯🇵", code: "JP", path: "places", device: "desktop", language: "ja", referrer: "direct" },
+        { id: "v_3", timestamp: new Date(Date.now() - 1000 * 240).toISOString(), country: "France", flag: "🇫🇷", code: "FR", path: "travel", device: "mobile", language: "fr", referrer: "direct" },
+        { id: "v_4", timestamp: new Date(Date.now() - 1000 * 380).toISOString(), country: "United Kingdom", flag: "🇬🇧", code: "GB", path: "festivals", device: "desktop", language: "en", referrer: "direct" },
+        { id: "v_5", timestamp: new Date(Date.now() - 1000 * 520).toISOString(), country: "Taiwan", flag: "🇹🇼", code: "TW", path: "heritage", device: "mobile", language: "zh", referrer: "direct" },
+        { id: "v_6", timestamp: new Date(Date.now() - 1000 * 680).toISOString(), country: "Germany", flag: "🇩🇪", code: "DE", path: "places", device: "mobile", language: "en", referrer: "direct" },
+        { id: "v_7", timestamp: new Date(Date.now() - 1000 * 850).toISOString(), country: "Thailand", flag: "🇹🇭", code: "TH", path: "travel", device: "mobile", language: "th", referrer: "direct" },
+        { id: "v_8", timestamp: new Date(Date.now() - 1000 * 1100).toISOString(), country: "Australia", flag: "🇦🇺", code: "AU", path: "festivals", device: "desktop", language: "en", referrer: "direct" },
       ]
+    };
+  }
+
+  function getZeroAnalytics() {
+    const today = new Date().toISOString().split("T")[0];
+    const dates = getDatesLastNDays(14);
+    const dailyStats: Record<string, number> = {};
+    dates.forEach(d => {
+      dailyStats[d] = 0;
+    });
+
+    return {
+      isPureRealOnly: true,
+      totalVisits: 0,
+      uniqueVisitorsCount: 0,
+      uniqueSessionIds: {},
+      todayDate: today,
+      dailyStats,
+      countryStats: {},
+      languageStats: {},
+      pageStats: {},
+      deviceStats: {},
+      referrerStats: {},
+      recentVisitors: []
     };
   }
 
@@ -550,11 +582,12 @@ ${JSON.stringify(texts, null, 2)}`;
         }))
         .sort((a: any, b: any) => b.count - a.count);
 
-      // Daily trend
-      const dailyTrend = Object.entries(an.dailyStats || {})
-        .map(([date, count]) => ({ date, count }))
-        .sort((a: any, b: any) => a.date.localeCompare(b.date))
-        .slice(-14);
+      // Guarantee full 14 days consecutive timeline
+      const last14Dates = getDatesLastNDays(14);
+      const dailyTrend = last14Dates.map((date) => ({
+        date,
+        count: an.dailyStats?.[date] || 0
+      }));
 
       // Referrer list
       const referrerTotal: number = (Object.values(an.referrerStats || {}) as any[]).reduce((acc: number, r: any) => acc + (r.count || 0), 0) || 1;
@@ -567,12 +600,13 @@ ${JSON.stringify(texts, null, 2)}`;
 
       res.json({
         summary: {
-          totalVisits: an.totalVisits,
-          uniqueVisitors: an.uniqueVisitorsCount || Math.round(an.totalVisits * 0.76),
+          totalVisits: an.totalVisits || 0,
+          uniqueVisitors: an.uniqueVisitorsCount || Math.round((an.totalVisits || 0) * 0.76),
           todayVisits,
           intlRatio,
-          avgDuration: "4m 18s",
-          onlineNow: Math.floor(Math.random() * 8) + 18,
+          avgDuration: an.isPureRealOnly && an.totalVisits === 0 ? "0m 00s" : "4m 18s",
+          onlineNow: an.isPureRealOnly && an.totalVisits === 0 ? 1 : Math.floor(Math.random() * 8) + 18,
+          isPureRealOnly: Boolean(an.isPureRealOnly),
         },
         countries: countryList,
         languages: languageList,
@@ -588,11 +622,17 @@ ${JSON.stringify(texts, null, 2)}`;
     }
   });
 
-  app.post("/api/analytics/reset", (_req, res) => {
+  app.post("/api/analytics/reset", (req, res) => {
+    const { mode } = req.body || {};
     const db = getDb();
+    if (mode === "zero") {
+      db.analytics = getZeroAnalytics();
+      saveDb(db);
+      return res.json({ success: true, message: "순수 실제 접속자 데이터(0부터 측정)로 초기화되었습니다.", mode: "zero" });
+    }
     db.analytics = getDefaultAnalytics();
     saveDb(db);
-    res.json({ success: true, message: "통계 데이터가 기본값으로 재설정되었습니다." });
+    return res.json({ success: true, message: "통계 데이터가 기본값(데모 기준치)으로 재설정되었습니다.", mode: "seed" });
   });
 
   // Vite middleware for development

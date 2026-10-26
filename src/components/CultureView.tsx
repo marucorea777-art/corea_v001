@@ -167,9 +167,9 @@ export default function CultureView() {
             
             <div className="relative z-10 max-w-xl space-y-2">
               <span className="text-[9px] font-mono tracking-widest text-amber-400 uppercase"><Translate>Interactive Capsule</Translate></span>
-              <h2 className="text-xl md:text-2xl font-display font-bold leading-tight">{activeCategoryData.title}</h2>
+              <h2 className="text-xl md:text-2xl font-display font-bold leading-tight">{t(activeCategoryData.title)}</h2>
               <p className="text-xs font-sans text-stone-300 leading-relaxed">
-                {activeCategoryData.intro}
+                {t(activeCategoryData.intro)}
               </p>
             </div>
           </motion.div>
@@ -193,7 +193,7 @@ export default function CultureView() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                 <div className="absolute bottom-3 left-4 text-white">
                   <h3 className="font-display font-bold text-base flex items-baseline gap-2">
-                    {item.title}
+                    {t(item.title)}
                     <span className="text-xs font-sans text-stone-300 font-normal">({item.koreanName})</span>
                   </h3>
                 </div>
@@ -201,14 +201,14 @@ export default function CultureView() {
               
               <div className="p-5 space-y-4">
                 <p className="text-xs text-stone-600 leading-relaxed font-sans">
-                  {item.details}
+                  {t(item.details)}
                 </p>
 
                 {/* Bullets */}
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {item.highlights.map((bullet, idx) => (
                     <span key={idx} className="text-[10px] font-mono bg-stone-50 text-stone-700 px-2.5 py-1 rounded-md border border-stone-100">
-                      • {bullet}
+                      • {t(bullet)}
                     </span>
                   ))}
                 </div>
@@ -218,7 +218,7 @@ export default function CultureView() {
             {item.tips && (
               <div className="mx-5 mb-5 p-3 rounded-xl bg-amber-50/50 border border-amber-100 text-[11px] text-stone-600 font-sans flex gap-2">
                 <span className="font-semibold text-amber-800 uppercase shrink-0 font-mono"><Translate>INSIDER TIP</Translate>:</span>
-                <p>{item.tips}</p>
+                <p>{t(item.tips)}</p>
               </div>
             )}
           </motion.div>
@@ -265,7 +265,7 @@ export default function CultureView() {
                 ))}
               </div>
               <p className="text-[10px] text-stone-400 leading-relaxed mt-1 italic">
-                "{selectedConcept.meaning}": {selectedConcept.poeticDescription}
+                "{t(selectedConcept.meaning)}": {t(selectedConcept.poeticDescription)}
               </p>
             </div>
 
@@ -286,7 +286,7 @@ export default function CultureView() {
                         : "bg-stone-800 text-stone-300 border-stone-700/60 hover:bg-stone-700"
                     }`}
                   >
-                    <span>{style.name}</span>
+                    <span>{t(style.name)}</span>
                     <span className="w-2 h-2 rounded-full bg-amber-400" />
                   </button>
                 ))}
@@ -418,7 +418,7 @@ export default function CultureView() {
                           {selectedConcept.romanization}
                         </div>
                         <div className="text-[10px] font-sans opacity-75 max-w-[200px] mx-auto leading-normal">
-                          {selectedConcept.meaning}
+                          {t(selectedConcept.meaning)}
                         </div>
                       </div>
                     </div>
@@ -582,7 +582,7 @@ export default function CultureView() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-stone-900">{card.recipientName}</span>
                       <span className="text-[10px] font-mono text-stone-400 bg-stone-100 px-2 py-0.5 rounded-md">
-                        {card.styleName}
+                        {t(card.styleName)}
                       </span>
                     </div>
                     <p className="text-[11px] text-stone-600 italic line-clamp-2 font-sans">

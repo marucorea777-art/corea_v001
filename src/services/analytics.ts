@@ -5,6 +5,7 @@ export interface VisitorSummary {
   intlRatio: number;
   avgDuration: string;
   onlineNow: number;
+  isPureRealOnly?: boolean;
 }
 
 export interface CountryStat {
@@ -129,6 +130,13 @@ export const DEFAULT_FALLBACK_STATS: AnalyticsStatsResponse = {
     { name: "LINE 메신저 및 기타", count: 593, percentage: 4.0 },
   ],
   dailyTrend: [
+    { date: "2026-10-11", count: 310 },
+    { date: "2026-10-12", count: 335 },
+    { date: "2026-10-13", count: 360 },
+    { date: "2026-10-14", count: 380 },
+    { date: "2026-10-15", count: 410 },
+    { date: "2026-10-16", count: 395 },
+    { date: "2026-10-17", count: 420 },
     { date: "2026-10-18", count: 385 },
     { date: "2026-10-19", count: 412 },
     { date: "2026-10-20", count: 398 },
@@ -237,9 +245,13 @@ export async function fetchAnalyticsStats(): Promise<AnalyticsStatsResponse> {
   }
 }
 
-export async function resetAnalyticsData(): Promise<boolean> {
+export async function resetAnalyticsData(mode: "zero" | "seed" = "seed"): Promise<boolean> {
   try {
-    const res = await fetch("/api/analytics/reset", { method: "POST" });
+    const res = await fetch("/api/analytics/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode })
+    });
     if (res.ok) {
       localStorage.removeItem(ANALYTICS_CACHE_KEY);
       return true;

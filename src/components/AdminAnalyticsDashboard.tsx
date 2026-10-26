@@ -8,7 +8,6 @@ import {
   Clock,
   Smartphone,
   Monitor,
-  Tablet,
   RefreshCw,
   Download,
   Calendar,
@@ -18,7 +17,10 @@ import {
   ShieldCheck,
   CheckCircle,
   Eye,
-  Activity
+  Activity,
+  Info,
+  RotateCcw,
+  Database
 } from "lucide-react";
 import {
   fetchAnalyticsStats,
@@ -37,10 +39,10 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
   const { t } = useTranslation();
   const [stats, setStats] = useState<AnalyticsStatsResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [timeRange, setTimeRange] = useState<"all" | "30d" | "7d" | "today">("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const loadData = async (showLoadingState = true) => {
     if (showLoadingState) setLoading(true);
@@ -59,11 +61,19 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
     }
   }, [isOpen]);
 
-  const handleReset = async () => {
-    if (window.confirm("통계 데이터를 기본 초기 데이터로 재설정하시겠습니까?")) {
-      const ok = await resetAnalyticsData();
+  const handleReset = async (mode: "zero" | "seed" = "seed") => {
+    const confirmMsg =
+      mode === "zero"
+        ? "⚠️ 기존 데모 데이터를 모두 지우고 '순수 실제 접속자만 0부터' 기록하시겠습니까?\n\n이후 발생하는 실제 방문자의 접속(세션/언어/국가/페이지)만 100% 실시간으로 반영됩니다."
+        : "통계 데이터를 기본 데모 기준치(시연용 기준 데이터)로 재설정하시겠습니까?";
+    if (window.confirm(confirmMsg)) {
+      const ok = await resetAnalyticsData(mode);
       if (ok) {
-        showToast("통계 데이터가 기본값으로 재설정되었습니다.");
+        showToast(
+          mode === "zero"
+            ? "순수 실제 접속자 데이터(0부터 집계)로 초기화되었습니다."
+            : "통계 데이터가 기본값으로 재설정되었습니다."
+        );
         loadData(false);
       }
     }
@@ -71,7 +81,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   const handleExportCSV = () => {
@@ -82,6 +92,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
       ...stats.languages.map(l => ["언어", l.name, l.count.toString(), `${l.percentage}%`]),
       ...stats.pages.map(p => ["페이지", p.name, p.count.toString(), `${p.percentage}%`]),
       ...stats.devices.map(d => ["기기", d.name, d.count.toString(), `${d.percentage}%`]),
+      ...stats.dailyTrend.map(t => ["일별추이", t.date, t.count.toString(), "-"]),
     ];
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + rows.map(e => e.join(",")).join("\n");
     const encodedUri = encodeURI(csvContent);
@@ -101,7 +112,38 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
     c.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const maxDailyCount = Math.max(...(stats?.dailyTrend.map(d => d.count) || [500]), 1);
+  const dailyTrend = stats?.dailyTrend || [];
+  const dailyCounts = dailyTrend.map(d => d.count);
+  const maxDailyCount = Math.max(...dailyCounts, 10);
+  const total14Days = dailyCounts.reduce((a, b) => a + b, 0);
+  const avg14Days = dailyCounts.length > 0 ? Math.round(total14Days / dailyCounts.length) : 0;
+  const peakItem = dailyTrend.reduce(
+    (prev, curr) => (curr.count > (prev?.count || 0) ? curr : prev),
+    dailyTrend[0] || { date: "", count: 0 }
+  );
+
+  // SVG Chart path calculation (viewBox: 0 0 500 120)
+  const svgWidth = 500;
+  const svgHeight = 120;
+  const paddingX = 18;
+  const chartPoints = dailyTrend.map((d, i) => {
+    const x = dailyTrend.length > 1
+      ? paddingX + (i / (dailyTrend.length - 1)) * (svgWidth - paddingX * 2)
+      : svgWidth / 2;
+    const y = svgHeight - 15 - (d.count / maxDailyCount) * 85;
+    return { x, y, ...d };
+  });
+
+  const svgLinePath = chartPoints.length > 0
+    ? `M ${chartPoints[0].x} ${chartPoints[0].y} ` +
+      chartPoints.slice(1).map(p => `L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ")
+    : "";
+
+  const svgAreaPath = chartPoints.length > 0
+    ? `${svgLinePath} L ${chartPoints[chartPoints.length - 1].x} ${svgHeight - 10} L ${chartPoints[0].x} ${svgHeight - 10} Z`
+    : "";
+
+  const isPureRealOnly = Boolean(stats?.summary?.isPureRealOnly);
 
   return (
     <AnimatePresence>
@@ -196,6 +238,58 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
               </div>
             ) : (
               <>
+                {/* Data Transparency & Pure-Real Toggle Banner */}
+                <div className={`p-4 rounded-2xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs ${
+                  isPureRealOnly
+                    ? "bg-emerald-50/80 border-emerald-200 text-emerald-900"
+                    : "bg-amber-50/70 border-amber-200 text-stone-800"
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                      isPureRealOnly ? "bg-emerald-600 text-white" : "bg-amber-500 text-white"
+                    }`}>
+                      <Database className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <strong className="text-sm font-semibold">
+                          {isPureRealOnly ? "🌱 순수 실제 방문객 유입 집계 모드 (100% Genuine Real)" : "📊 실시간 실제 방문 추적 + 기준 시드 모드"}
+                        </strong>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                          isPureRealOnly ? "bg-emerald-200 text-emerald-800" : "bg-amber-200 text-amber-800"
+                        }`}>
+                          {isPureRealOnly ? "PURE REAL-ONLY" : "HYBRID TRACKING"}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-600 leading-relaxed">
+                        {isPureRealOnly
+                          ? "인위적인 샘플 데이터를 배제하고, 실제 접속자의 세션, 국가, 언어, 페이지 클릭만 0부터 100% 실시간 누적 기록 중입니다."
+                          : "현재 통계는 사이트 개설 시 초기 레이아웃 예시(시드 데이터) 위에 실제 사용자의 접속(국가/기기/페이지)이 1건씩 실시간 누적 가산되고 있습니다."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                    {isPureRealOnly ? (
+                      <button
+                        onClick={() => handleReset("seed")}
+                        className="px-3 py-1.5 bg-white hover:bg-stone-100 text-stone-700 rounded-xl font-medium border border-stone-200 transition-colors cursor-pointer text-xs flex items-center gap-1.5 shadow-2xs"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-stone-500" />
+                        <span>데모 기준치 복원</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleReset("zero")}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-colors cursor-pointer text-xs flex items-center gap-1.5 shadow-xs"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        <span>0부터 순수 실제 유입만 집계</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 {/* 1. Summary KPI Cards */}
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
                   
@@ -210,7 +304,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                     </div>
                     <div className="flex items-center gap-1 text-[11px] text-emerald-600 font-semibold">
                       <TrendingUp className="w-3 h-3" />
-                      <span>+18.4% <Translate>전주 대비</Translate></span>
+                      <span>{isPureRealOnly ? "실제 유입 누적" : "+18.4% 전주 대비"}</span>
                     </div>
                   </div>
 
@@ -238,7 +332,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                       {stats.summary.intlRatio}%
                     </div>
                     <div className="text-[11px] text-emerald-600/80 font-sans">
-                      <Translate>글로벌 관광객 유입 강세</Translate>
+                      <Translate>글로벌 관광객 유입 현황</Translate>
                     </div>
                   </div>
 
@@ -301,91 +395,205 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                     </div>
 
                     {/* Countries List with Progress Bars */}
-                    <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                      {filteredCountries.map((c) => (
-                        <div key={c.code} className="group hover:bg-stone-50/80 p-2 rounded-xl transition-colors">
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <div className="flex items-center gap-2 font-medium text-stone-800">
-                              <span className="text-base">{c.flag}</span>
-                              <span className="font-semibold">{c.name}</span>
-                              <span className="text-[10px] text-stone-400 font-mono">({c.code})</span>
+                    {filteredCountries.length === 0 ? (
+                      <div className="py-12 text-center text-xs text-stone-400">
+                        {isPureRealOnly ? "아직 등록된 국가별 유입 데이터가 없습니다." : "검색된 국가가 없습니다."}
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                        {filteredCountries.map((c) => (
+                          <div key={c.code} className="group hover:bg-stone-50/80 p-2 rounded-xl transition-colors">
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <div className="flex items-center gap-2 font-medium text-stone-800">
+                                <span className="text-base">{c.flag}</span>
+                                <span className="font-semibold">{c.name}</span>
+                                <span className="text-[10px] text-stone-400 font-mono">({c.code})</span>
+                              </div>
+                              <div className="flex items-center gap-3 font-mono">
+                                <span className="font-bold text-stone-900">{c.count.toLocaleString()}회</span>
+                                <span className="w-12 text-right text-stone-500 font-semibold">{c.percentage}%</span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-3 font-mono">
-                              <span className="font-bold text-stone-900">{c.count.toLocaleString()}회</span>
-                              <span className="w-12 text-right text-stone-500 font-semibold">{c.percentage}%</span>
+                            
+                            {/* Progress bar */}
+                            <div className="w-full bg-stone-100 h-2 rounded-full overflow-hidden">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${Math.min(c.percentage * 2.8, 100)}%` }}
+                                transition={{ duration: 0.6, ease: "easeOut" }}
+                                className={`h-full rounded-full ${
+                                  c.code === "US"
+                                    ? "bg-blue-600"
+                                    : c.code === "JP"
+                                    ? "bg-red-500"
+                                    : c.code === "CN" || c.code === "TW"
+                                    ? "bg-amber-500"
+                                    : c.code === "KR"
+                                    ? "bg-stone-800"
+                                    : "bg-teal-500"
+                                }`}
+                              />
                             </div>
                           </div>
-                          
-                          {/* Progress bar */}
-                          <div className="w-full bg-stone-100 h-2 rounded-full overflow-hidden">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${Math.min(c.percentage * 2.8, 100)}%` }}
-                              transition={{ duration: 0.6, ease: "easeOut" }}
-                              className={`h-full rounded-full ${
-                                c.code === "US"
-                                  ? "bg-blue-600"
-                                  : c.code === "JP"
-                                  ? "bg-red-500"
-                                  : c.code === "CN" || c.code === "TW"
-                                  ? "bg-amber-500"
-                                  : c.code === "KR"
-                                  ? "bg-stone-800"
-                                  : "bg-teal-500"
-                              }`}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* RIGHT: Daily Traffic Chart & Popular Pages (5 cols) */}
                   <div className="lg:col-span-5 space-y-6">
                     
-                    {/* Daily Visitors Trend Chart (SVG) */}
-                    <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-xs space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-stone-900 text-sm flex items-center gap-2">
-                          <TrendingUp className="w-4 h-4 text-emerald-600" />
-                          <Translate>최근 일별 방문자 추이 (14일)</Translate>
-                        </h4>
-                        <span className="text-[10px] font-mono text-stone-400">Daily Volume</span>
+                    {/* Daily Visitors Trend Chart (SVG Curve + Bars) */}
+                    <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-xs space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <h4 className="font-bold text-stone-900 text-sm flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4 text-emerald-600" />
+                            <Translate>최근 일별 방문자 추이 (14일)</Translate>
+                          </h4>
+                          <p className="text-[11px] text-stone-400">
+                            14일 누적: <strong className="text-stone-700">{total14Days.toLocaleString()}명</strong> (일평균 {avg14Days.toLocaleString()}명)
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-mono">
+                          <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-semibold">
+                            최고치: {peakItem?.count || 0}명 ({peakItem?.date?.slice(5)})
+                          </span>
+                        </div>
                       </div>
 
-                      {/* Bar Visualization */}
-                      <div className="pt-2">
-                        <div className="h-36 flex items-end gap-1.5 justify-between border-b border-stone-200 pb-1">
-                          {stats.dailyTrend.map((d, idx) => {
-                            const barHeightPercent = Math.max(Math.round((d.count / maxDailyCount) * 100), 8);
-                            const isToday = idx === stats.dailyTrend.length - 1;
-                            return (
-                              <div
-                                key={d.date}
-                                className="flex-1 flex flex-col items-center gap-1 group relative cursor-pointer"
-                              >
-                                {/* Tooltip */}
-                                <div className="absolute -top-8 bg-stone-900 text-white text-[9px] font-mono px-2 py-0.5 rounded shadow-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                                  {d.date}: {d.count}명
-                                </div>
-                                <motion.div
-                                  initial={{ height: 0 }}
-                                  animate={{ height: `${barHeightPercent}%` }}
-                                  transition={{ duration: 0.5, delay: idx * 0.03 }}
-                                  className={`w-full rounded-t-sm transition-colors ${
-                                    isToday
-                                      ? "bg-amber-500 group-hover:bg-amber-600"
-                                      : "bg-stone-300 group-hover:bg-stone-400"
-                                  }`}
-                                />
-                              </div>
-                            );
-                          })}
+                      {/* Interactive Visual Arena */}
+                      <div className="relative pt-2 pb-1">
+                        {/* Background Grid Guide Lines */}
+                        <div className="absolute inset-x-0 top-3 bottom-8 flex flex-col justify-between pointer-events-none opacity-40">
+                          <div className="border-b border-dashed border-stone-200 flex justify-between text-[9px] text-stone-400 font-mono pr-1">
+                            <span></span>
+                            <span>{maxDailyCount}명</span>
+                          </div>
+                          <div className="border-b border-dashed border-stone-200 flex justify-between text-[9px] text-stone-400 font-mono pr-1">
+                            <span></span>
+                            <span>{Math.round(maxDailyCount / 2)}명</span>
+                          </div>
+                          <div className="border-b border-stone-200 flex justify-between text-[9px] text-stone-400 font-mono pr-1">
+                            <span></span>
+                            <span>0명</span>
+                          </div>
                         </div>
-                        <div className="flex justify-between text-[9px] text-stone-400 font-mono mt-1 px-1">
-                          <span>{stats.dailyTrend[0]?.date.slice(5)}</span>
-                          <span><Translate>최근 14일</Translate></span>
-                          <span className="font-bold text-amber-600">{stats.dailyTrend[stats.dailyTrend.length - 1]?.date.slice(5)} (오늘)</span>
+
+                        {/* SVG Trend Area Curve Overlay */}
+                        <div className="relative h-44 w-full">
+                          <svg
+                            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+                            className="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
+                            preserveAspectRatio="none"
+                          >
+                            <defs>
+                              <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.28" />
+                                <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.02" />
+                              </linearGradient>
+                            </defs>
+                            {svgAreaPath && (
+                              <path d={svgAreaPath} fill="url(#trendGradient)" />
+                            )}
+                            {svgLinePath && (
+                              <path
+                                d={svgLinePath}
+                                fill="none"
+                                stroke="#f59e0b"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            )}
+                          </svg>
+
+                          {/* 14 Interactive Pillar Columns with Guaranteed Pixel Heights */}
+                          <div className="absolute inset-0 flex items-end justify-between gap-1 px-1">
+                            {dailyTrend.map((d, idx) => {
+                              const isToday = idx === dailyTrend.length - 1;
+                              const isHovered = hoveredIdx === idx;
+                              // Pixel height calculation based on 110px max height
+                              const barHeightPx = Math.max(
+                                Math.round((d.count / maxDailyCount) * 110),
+                                d.count > 0 ? 8 : 3
+                              );
+                              const dayLabel = d.date.slice(8); // Day of month e.g. "11", "24"
+                              const fullDateShort = d.date.slice(5); // e.g. "10-24"
+
+                              return (
+                                <div
+                                  key={d.date}
+                                  onMouseEnter={() => setHoveredIdx(idx)}
+                                  onMouseLeave={() => setHoveredIdx(null)}
+                                  className="flex-1 h-full flex flex-col justify-end items-center relative group cursor-pointer"
+                                >
+                                  {/* Floating Info Tooltip */}
+                                  <div
+                                    className={`absolute -top-10 bg-stone-900 text-white text-[10px] font-mono px-2.5 py-1 rounded-lg shadow-xl whitespace-nowrap z-30 transition-all pointer-events-none ${
+                                      isHovered
+                                        ? "opacity-100 scale-100 -translate-y-1"
+                                        : "opacity-0 scale-95 pointer-events-none"
+                                    }`}
+                                  >
+                                    <div className="font-bold text-amber-300">
+                                      {fullDateShort} {isToday ? "(오늘)" : ""}
+                                    </div>
+                                    <div className="text-stone-200">
+                                      방문자: <strong>{d.count.toLocaleString()}명</strong>
+                                    </div>
+                                  </div>
+
+                                  {/* Top dot on the curve */}
+                                  <div
+                                    className={`w-2 h-2 rounded-full mb-1 transition-all z-20 ${
+                                      isToday
+                                        ? "bg-amber-500 ring-2 ring-amber-300 animate-pulse"
+                                        : isHovered
+                                        ? "bg-amber-600 ring-2 ring-amber-200"
+                                        : "bg-stone-300 opacity-60"
+                                    }`}
+                                  />
+
+                                  {/* Bar Pillar */}
+                                  <div
+                                    style={{ height: `${barHeightPx}px` }}
+                                    className={`w-full max-w-[16px] sm:max-w-[20px] rounded-t-md transition-all duration-300 shadow-2xs ${
+                                      isToday
+                                        ? "bg-gradient-to-t from-amber-600 via-amber-500 to-amber-400 group-hover:brightness-110"
+                                        : isHovered
+                                        ? "bg-stone-500"
+                                        : "bg-stone-300 group-hover:bg-stone-400"
+                                    }`}
+                                  />
+
+                                  {/* Day label */}
+                                  <div className="mt-1.5 text-center">
+                                    <span
+                                      className={`text-[9px] font-mono block leading-none ${
+                                        isToday
+                                          ? "text-amber-700 font-bold bg-amber-100/80 px-1 py-0.5 rounded"
+                                          : "text-stone-400 group-hover:text-stone-700"
+                                      }`}
+                                    >
+                                      {dayLabel}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Bottom Chart Footer Legend */}
+                        <div className="flex items-center justify-between text-[10px] text-stone-400 font-mono mt-3 px-2 border-t border-stone-100 pt-2">
+                          <span>📅 {dailyTrend[0]?.date.slice(5)} (14일 전)</span>
+                          <span className="flex items-center gap-1.5 text-stone-500">
+                            <span className="w-2.5 h-2.5 rounded-xs bg-stone-300 inline-block" />
+                            <span>일반 방문</span>
+                            <span className="w-2.5 h-2.5 rounded-xs bg-amber-500 inline-block ml-1" />
+                            <span className="text-amber-700 font-semibold">오늘 ({dailyTrend[dailyTrend.length - 1]?.date.slice(5)})</span>
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -536,15 +744,26 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
 
           {/* Footer Bar */}
           <div className="bg-stone-100 px-6 py-3.5 border-t border-stone-200 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500 shrink-0">
-            <div className="flex items-center gap-2 text-stone-400">
-              <ShieldCheck className="w-4 h-4 text-amber-600" />
-              <span><Translate>관리자 전용 통계 시스템</Translate></span>
-              <span>•</span>
+            <div className="flex flex-wrap items-center gap-3 text-stone-400">
+              <div className="flex items-center gap-1.5 text-stone-600 font-medium">
+                <ShieldCheck className="w-4 h-4 text-amber-600" />
+                <span><Translate>관리자 전용 통계 시스템</Translate></span>
+              </div>
+              <span className="hidden sm:inline text-stone-300">•</span>
               <button
-                onClick={handleReset}
-                className="text-stone-400 hover:text-red-600 transition-colors cursor-pointer text-[11px] underline"
+                onClick={() => handleReset("zero")}
+                className="text-stone-500 hover:text-emerald-700 transition-colors cursor-pointer text-[11px] font-medium underline"
+                title="인위적 시드를 모두 지우고 실제 유입자만 0부터 집계"
               >
-                <Translate>통계 초기화</Translate>
+                <Translate>순수 실제 접속자만 0부터 측정하기</Translate>
+              </button>
+              <span className="text-stone-300">|</span>
+              <button
+                onClick={() => handleReset("seed")}
+                className="text-stone-400 hover:text-stone-600 transition-colors cursor-pointer text-[11px] underline"
+                title="데모 기준치 시드로 복원"
+              >
+                <Translate>데모 기준치로 복구</Translate>
               </button>
             </div>
 

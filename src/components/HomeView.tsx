@@ -334,7 +334,7 @@ export default function HomeView({ setActiveTab, onOpenShareModal }: HomeViewPro
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
             <span className="absolute bottom-2 left-2 text-[9px] font-mono text-white bg-black/40 px-2 py-0.5 rounded-full">
-              {highlightPlace.locationLabel}
+              <Translate>{highlightPlace.locationLabel}</Translate>
             </span>
           </div>
           <div className="p-5 md:w-3/5 flex flex-col justify-between space-y-4">
