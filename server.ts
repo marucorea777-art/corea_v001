@@ -101,6 +101,7 @@ ${JSON.stringify(texts, null, 2)}`;
           festivals: [],
           deletedDestinationIds: [],
           deletedFestivalIds: [],
+          analytics: getZeroAnalytics(),
         };
         fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf8");
         return initial;
@@ -321,7 +322,7 @@ ${JSON.stringify(texts, null, 2)}`;
     return dates;
   }
 
-  function getDefaultAnalytics() {
+  function getSeedAnalytics() {
     const today = new Date().toISOString().split("T")[0];
     const dates = getDatesLastNDays(14);
 
@@ -423,6 +424,10 @@ ${JSON.stringify(texts, null, 2)}`;
       referrerStats: {},
       recentVisitors: []
     };
+  }
+
+  function getDefaultAnalytics() {
+    return getZeroAnalytics();
   }
 
   app.post("/api/analytics/track", (req, res) => {
@@ -630,14 +635,14 @@ ${JSON.stringify(texts, null, 2)}`;
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     const { mode } = req.body || {};
     const db = getDb();
-    if (mode === "zero") {
-      db.analytics = getZeroAnalytics();
+    if (mode === "seed") {
+      db.analytics = getSeedAnalytics();
       saveDb(db);
-      return res.json({ success: true, message: "순수 실제 접속자 데이터(0부터 측정)로 초기화되었습니다.", mode: "zero" });
+      return res.json({ success: true, message: "통계 데이터가 데모 기준치(시연용 14,821명)로 복원되었습니다.", mode: "seed" });
     }
-    db.analytics = getDefaultAnalytics();
+    db.analytics = getZeroAnalytics();
     saveDb(db);
-    return res.json({ success: true, message: "통계 데이터가 기본값(데모 기준치)으로 재설정되었습니다.", mode: "seed" });
+    return res.json({ success: true, message: "순수 실제 접속자 데이터(0부터 측정)로 초기화되었습니다.", mode: "zero" });
   });
 
   // Vite middleware for development

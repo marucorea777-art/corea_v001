@@ -72,7 +72,7 @@ export interface AnalyticsStatsResponse {
 
 const ANALYTICS_CACHE_KEY = "corea_labs_analytics_cache";
 
-export const DEFAULT_FALLBACK_STATS: AnalyticsStatsResponse = {
+export const SEED_FALLBACK_STATS: AnalyticsStatsResponse = {
   summary: {
     totalVisits: 14821,
     uniqueVisitors: 11291,
@@ -80,6 +80,7 @@ export const DEFAULT_FALLBACK_STATS: AnalyticsStatsResponse = {
     intlRatio: 97.4,
     avgDuration: "4m 18s",
     onlineNow: 25,
+    isPureRealOnly: false,
   },
   countries: [
     { code: "US", name: "United States", flag: "🇺🇸", count: 4821, percentage: 32.5 },
@@ -236,9 +237,11 @@ export const ZERO_FALLBACK_STATS: AnalyticsStatsResponse = {
   recentVisitors: [],
 };
 
+export const DEFAULT_FALLBACK_STATS: AnalyticsStatsResponse = ZERO_FALLBACK_STATS;
+
 export async function fetchAnalyticsStats(): Promise<AnalyticsStatsResponse> {
   try {
-    const res = await fetch("/api/analytics/stats", {
+    const res = await fetch(`/api/analytics/stats?_t=${Date.now()}`, {
       cache: "no-store",
       headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" }
     });
@@ -262,23 +265,21 @@ export async function fetchAnalyticsStats(): Promise<AnalyticsStatsResponse> {
     throw new Error("Invalid schema");
   } catch (err) {
     console.warn("fetchAnalyticsStats network issue, loading from cache or fallback:", err);
-    try {
-      const cached = localStorage.getItem(ANALYTICS_CACHE_KEY);
-      if (cached) {
-        return JSON.parse(cached);
-      }
-    } catch {}
-    const mode = localStorage.getItem("corea_labs_analytics_mode");
-    if (mode === "zero") {
-      return ZERO_FALLBACK_STATS;
+    const mode = typeof window !== "undefined" ? localStorage.getItem("corea_labs_analytics_mode") : null;
+    if (mode === "seed") {
+      try {
+        const cached = localStorage.getItem(ANALYTICS_CACHE_KEY);
+        if (cached) return JSON.parse(cached);
+      } catch {}
+      return SEED_FALLBACK_STATS;
     }
-    return DEFAULT_FALLBACK_STATS;
+    return ZERO_FALLBACK_STATS;
   }
 }
 
 export async function resetAnalyticsData(mode: "zero" | "seed" = "seed"): Promise<boolean> {
   try {
-    const res = await fetch("/api/analytics/reset", {
+    const res = await fetch(`/api/analytics/reset?_t=${Date.now()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode })

@@ -95,14 +95,34 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
 
   const executeReset = async (mode: "zero" | "seed") => {
     setIsResetting(true);
+    if (mode === "zero") {
+      setStats({
+        summary: {
+          totalVisits: 0,
+          uniqueVisitors: 0,
+          todayVisits: 0,
+          intlRatio: 0,
+          avgDuration: "0m 00s",
+          onlineNow: 0,
+          isPureRealOnly: true,
+        },
+        countries: [],
+        languages: [],
+        pages: [],
+        devices: [],
+        referrers: [],
+        dailyTrend: (stats?.dailyTrend || []).map(d => ({ ...d, count: 0 })),
+        recentVisitors: [],
+      });
+    }
     const ok = await resetAnalyticsData(mode);
     setIsResetting(false);
     setConfirmModal(null);
     if (ok) {
       showToast(
         mode === "zero"
-          ? "데모 데이터가 모두 삭제되었습니다. 이제 실제 방문자만 0부터 집계됩니다."
-          : "통계 데이터가 데모 기준치(시연용 14,821명)로 복원되었습니다."
+          ? "✅ 데모 데이터가 모두 삭제되었습니다. 실시간 방문자 수: 0명 (실제 접속자만 집계)"
+          : "✅ 통계 데이터가 데모 기준치(시연용 14,821명)로 복원되었습니다."
       );
       await loadData(false);
     } else {
@@ -211,23 +231,23 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
             <div className="flex items-center gap-2">
               {isPureRealOnly ? (
                 <button
-                  onClick={() => requestReset("seed")}
+                  onClick={() => executeReset("seed")}
                   disabled={isResetting || isRefreshing}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer border border-amber-400/30"
                   title="데모 기준치 복원 (시연용 14,821명)"
                 >
-                  <RotateCcw className="w-3.5 h-3.5 text-amber-300" />
+                  <RotateCcw className={`w-3.5 h-3.5 text-amber-300 ${isResetting ? "animate-spin" : ""}`} />
                   <span className="hidden sm:inline"><Translate>데모 데이터 복원</Translate></span>
                 </button>
               ) : (
                 <button
-                  onClick={() => requestReset("zero")}
+                  onClick={() => executeReset("zero")}
                   disabled={isResetting || isRefreshing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer border border-rose-500/30"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer border border-rose-500 shadow-sm"
                   title="데모 데이터 삭제 (실제 0부터 시작)"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                  <span className="hidden sm:inline"><Translate>데모 데이터 지우기</Translate></span>
+                  <Trash2 className="w-3.5 h-3.5 text-white" />
+                  <span><Translate>데모버전 지우기 (0부터 시작)</Translate></span>
                 </button>
               )}
 
@@ -325,16 +345,16 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                   <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
                     {isPureRealOnly ? (
                       <button
-                        onClick={() => requestReset("seed")}
+                        onClick={() => executeReset("seed")}
                         disabled={isResetting}
                         className="px-3.5 py-2 bg-white hover:bg-stone-100 text-stone-700 rounded-xl font-semibold border border-stone-200 transition-colors cursor-pointer text-xs flex items-center gap-1.5 shadow-2xs active:scale-95"
                       >
-                        <RotateCcw className="w-3.5 h-3.5 text-stone-500" />
+                        <RotateCcw className={`w-3.5 h-3.5 text-stone-500 ${isResetting ? "animate-spin" : ""}`} />
                         <span><Translate>데모 데이터 복원 (14,821명)</Translate></span>
                       </button>
                     ) : (
                       <button
-                        onClick={() => requestReset("zero")}
+                        onClick={() => executeReset("zero")}
                         disabled={isResetting}
                         className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition-all cursor-pointer text-xs flex items-center gap-1.5 shadow-xs active:scale-95"
                       >
@@ -806,7 +826,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
               </div>
               <span className="hidden sm:inline text-stone-300">•</span>
               <button
-                onClick={() => requestReset("zero")}
+                onClick={() => executeReset("zero")}
                 disabled={isResetting}
                 className="text-stone-500 hover:text-rose-600 transition-colors cursor-pointer text-[11px] font-medium underline flex items-center gap-1"
                 title="인위적 시드를 모두 지우고 실제 유입자만 0부터 집계"
@@ -816,7 +836,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
               </button>
               <span className="text-stone-300">|</span>
               <button
-                onClick={() => requestReset("seed")}
+                onClick={() => executeReset("seed")}
                 disabled={isResetting}
                 className="text-stone-400 hover:text-stone-600 transition-colors cursor-pointer text-[11px] underline flex items-center gap-1"
                 title="데모 기준치 시드로 복원"
