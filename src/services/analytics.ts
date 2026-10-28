@@ -217,9 +217,31 @@ export async function trackPageView(page: string, language: string = "en") {
   }
 }
 
+export const ZERO_FALLBACK_STATS: AnalyticsStatsResponse = {
+  summary: {
+    totalVisits: 0,
+    uniqueVisitors: 0,
+    todayVisits: 0,
+    intlRatio: 0,
+    avgDuration: "0m 00s",
+    onlineNow: 1,
+    isPureRealOnly: true,
+  },
+  countries: [],
+  languages: [],
+  pages: [],
+  devices: [],
+  referrers: [],
+  dailyTrend: [],
+  recentVisitors: [],
+};
+
 export async function fetchAnalyticsStats(): Promise<AnalyticsStatsResponse> {
   try {
-    const res = await fetch("/api/analytics/stats");
+    const res = await fetch("/api/analytics/stats", {
+      cache: "no-store",
+      headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" }
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const ct = res.headers.get("content-type");
     if (!ct || !ct.includes("application/json")) {
@@ -229,6 +251,11 @@ export async function fetchAnalyticsStats(): Promise<AnalyticsStatsResponse> {
     if (data && data.summary) {
       try {
         localStorage.setItem(ANALYTICS_CACHE_KEY, JSON.stringify(data));
+        if (data.summary.isPureRealOnly) {
+          localStorage.setItem("corea_labs_analytics_mode", "zero");
+        } else {
+          localStorage.setItem("corea_labs_analytics_mode", "seed");
+        }
       } catch {}
       return data;
     }
@@ -241,6 +268,10 @@ export async function fetchAnalyticsStats(): Promise<AnalyticsStatsResponse> {
         return JSON.parse(cached);
       }
     } catch {}
+    const mode = localStorage.getItem("corea_labs_analytics_mode");
+    if (mode === "zero") {
+      return ZERO_FALLBACK_STATS;
+    }
     return DEFAULT_FALLBACK_STATS;
   }
 }
@@ -253,7 +284,10 @@ export async function resetAnalyticsData(mode: "zero" | "seed" = "seed"): Promis
       body: JSON.stringify({ mode })
     });
     if (res.ok) {
-      localStorage.removeItem(ANALYTICS_CACHE_KEY);
+      try {
+        localStorage.setItem("corea_labs_analytics_mode", mode);
+        localStorage.removeItem(ANALYTICS_CACHE_KEY);
+      } catch {}
       return true;
     }
     return false;

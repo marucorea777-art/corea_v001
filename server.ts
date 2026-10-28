@@ -533,6 +533,7 @@ ${JSON.stringify(texts, null, 2)}`;
 
   app.get("/api/analytics/stats", (_req, res) => {
     try {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
       const db = getDb();
       if (!db.analytics) {
         db.analytics = getDefaultAnalytics();
@@ -540,28 +541,29 @@ ${JSON.stringify(texts, null, 2)}`;
       }
 
       const an = db.analytics;
-      const total = an.totalVisits || 1;
+      const isPureReal = Boolean(an.isPureRealOnly);
+      const total = an.totalVisits || 0;
       const today = new Date().toISOString().split("T")[0];
-      const todayVisits = an.dailyStats?.[today] || 432;
+      const todayVisits = an.dailyStats?.[today] ?? 0;
 
       // Calculate country list with percentages
       const countryList = Object.values(an.countryStats || {})
         .map((c: any) => ({
           ...c,
-          percentage: Number(((c.count / total) * 100).toFixed(1))
+          percentage: total > 0 ? Number(((c.count / total) * 100).toFixed(1)) : 0
         }))
         .sort((a: any, b: any) => b.count - a.count);
 
       // International visitor ratio (everything except KR)
       const krCount = an.countryStats?.["KR"]?.count || 0;
-      const intlCount = total - krCount;
-      const intlRatio = Number(((intlCount / total) * 100).toFixed(1));
+      const intlCount = Math.max(0, total - krCount);
+      const intlRatio = total > 0 ? Number(((intlCount / total) * 100).toFixed(1)) : 0;
 
       // Language list
       const languageList = Object.values(an.languageStats || {})
         .map((l: any) => ({
           ...l,
-          percentage: Number(((l.count / total) * 100).toFixed(1))
+          percentage: total > 0 ? Number(((l.count / total) * 100).toFixed(1)) : 0
         }))
         .sort((a: any, b: any) => b.count - a.count);
 
@@ -569,16 +571,16 @@ ${JSON.stringify(texts, null, 2)}`;
       const pageList = Object.values(an.pageStats || {})
         .map((p: any) => ({
           ...p,
-          percentage: Number(((p.count / total) * 100).toFixed(1))
+          percentage: total > 0 ? Number(((p.count / total) * 100).toFixed(1)) : 0
         }))
         .sort((a: any, b: any) => b.count - a.count);
 
       // Device list
-      const deviceTotal: number = (Object.values(an.deviceStats || {}) as any[]).reduce((acc: number, d: any) => acc + (d.count || 0), 0) || 1;
+      const deviceTotal: number = (Object.values(an.deviceStats || {}) as any[]).reduce((acc: number, d: any) => acc + (d.count || 0), 0) || 0;
       const deviceList = Object.values(an.deviceStats || {})
         .map((d: any) => ({
           ...d,
-          percentage: Number(((d.count / deviceTotal) * 100).toFixed(1))
+          percentage: deviceTotal > 0 ? Number(((d.count / deviceTotal) * 100).toFixed(1)) : 0
         }))
         .sort((a: any, b: any) => b.count - a.count);
 
@@ -590,23 +592,25 @@ ${JSON.stringify(texts, null, 2)}`;
       }));
 
       // Referrer list
-      const referrerTotal: number = (Object.values(an.referrerStats || {}) as any[]).reduce((acc: number, r: any) => acc + (r.count || 0), 0) || 1;
+      const referrerTotal: number = (Object.values(an.referrerStats || {}) as any[]).reduce((acc: number, r: any) => acc + (r.count || 0), 0) || 0;
       const referrerList = Object.values(an.referrerStats || {})
         .map((r: any) => ({
           ...r,
-          percentage: Number(((r.count / referrerTotal) * 100).toFixed(1))
+          percentage: referrerTotal > 0 ? Number(((r.count / referrerTotal) * 100).toFixed(1)) : 0
         }))
         .sort((a: any, b: any) => b.count - a.count);
 
+      const uniqueVisitors = an.uniqueVisitorsCount ?? (isPureReal ? total : Math.round(total * 0.76));
+
       res.json({
         summary: {
-          totalVisits: an.totalVisits || 0,
-          uniqueVisitors: an.uniqueVisitorsCount || Math.round((an.totalVisits || 0) * 0.76),
+          totalVisits: total,
+          uniqueVisitors,
           todayVisits,
           intlRatio,
-          avgDuration: an.isPureRealOnly && an.totalVisits === 0 ? "0m 00s" : "4m 18s",
-          onlineNow: an.isPureRealOnly && an.totalVisits === 0 ? 1 : Math.floor(Math.random() * 8) + 18,
-          isPureRealOnly: Boolean(an.isPureRealOnly),
+          avgDuration: isPureReal ? (total > 0 ? "1m 30s" : "0m 00s") : "4m 18s",
+          onlineNow: isPureReal ? (total > 0 ? 1 : 0) : Math.floor(Math.random() * 8) + 18,
+          isPureRealOnly: isPureReal,
         },
         countries: countryList,
         languages: languageList,
@@ -623,6 +627,7 @@ ${JSON.stringify(texts, null, 2)}`;
   });
 
   app.post("/api/analytics/reset", (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     const { mode } = req.body || {};
     const db = getDb();
     if (mode === "zero") {
