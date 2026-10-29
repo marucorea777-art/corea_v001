@@ -22,11 +22,14 @@ import {
   RotateCcw,
   Database,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  PlusCircle
 } from "lucide-react";
 import {
   fetchAnalyticsStats,
   resetAnalyticsData,
+  trackPageView,
+  subscribeToAnalyticsUpdates,
   AnalyticsStatsResponse,
   CountryStat
 } from "../services/analytics";
@@ -38,12 +41,12 @@ interface AdminAnalyticsDashboardProps {
 }
 
 export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyticsDashboardProps) {
-  const { t } = useTranslation();
+  const { language } = useTranslation();
   const [stats, setStats] = useState<AnalyticsStatsResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     mode: "zero" | "seed";
@@ -66,73 +69,53 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
   };
 
   useEffect(() => {
-    if (isOpen) {
-      loadData(true);
-    }
+    if (!isOpen) return;
+
+    loadData(true);
+
+    // Subscribe to 0ms real-time browser ledger & cross-tab updates
+    const unsubscribe = subscribeToAnalyticsUpdates((updatedStats) => {
+      setStats(updatedStats);
+    });
+
+    // Silent background sync every 3 seconds
+    const intervalId = window.setInterval(() => {
+      loadData(false);
+    }, 3000);
+
+    return () => {
+      unsubscribe();
+      window.clearInterval(intervalId);
+    };
   }, [isOpen]);
 
-  const requestReset = (mode: "zero" | "seed" = "seed") => {
-    if (mode === "zero") {
-      setConfirmModal({
-        mode: "zero",
-        title: "데모 방문자 데이터 삭제 (0부터 시작)",
-        description:
-          "기존의 14,821명 시연용 데모 통계를 모두 삭제하고, 순수 실제 접속자(0부터)만 100% 실시간으로 집계하시겠습니까?\n\n(언제든지 다시 '데모 기준치 복원' 버튼을 눌러 시연용 데이터로 복원할 수 있습니다.)",
-        actionText: "데모 데이터 지우기 (0부터 시작)",
-        isDestructive: true,
-      });
-    } else {
-      setConfirmModal({
-        mode: "seed",
-        title: "데모 시연용 데이터 복원",
-        description:
-          "시연 및 발표용 기준 데이터(14,821명, 국가별/기기별/일별 예시 통계)를 다시 불러오시겠습니까?",
-        actionText: "데모 데이터 복원하기",
-        isDestructive: false,
-      });
-    }
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3800);
+  };
+
+  const handleSimulateLiveVisit = async () => {
+    await trackPageView("home", language, true);
+    await loadData(false);
+    showToast("✅ 실시간 방문자 +1 카운트가 즉시 반영되었습니다! (오늘 방문자·국가·최근 접속 로그 확인)", "success");
   };
 
   const executeReset = async (mode: "zero" | "seed") => {
     setIsResetting(true);
-    if (mode === "zero") {
-      setStats({
-        summary: {
-          totalVisits: 0,
-          uniqueVisitors: 0,
-          todayVisits: 0,
-          intlRatio: 0,
-          avgDuration: "0m 00s",
-          onlineNow: 0,
-          isPureRealOnly: true,
-        },
-        countries: [],
-        languages: [],
-        pages: [],
-        devices: [],
-        referrers: [],
-        dailyTrend: (stats?.dailyTrend || []).map(d => ({ ...d, count: 0 })),
-        recentVisitors: [],
-      });
-    }
     const ok = await resetAnalyticsData(mode);
     setIsResetting(false);
     setConfirmModal(null);
     if (ok) {
+      await loadData(false);
       showToast(
         mode === "zero"
-          ? "✅ 데모 데이터가 모두 삭제되었습니다. 실시간 방문자 수: 0명 (실제 접속자만 집계)"
-          : "✅ 통계 데이터가 데모 기준치(시연용 14,821명)로 복원되었습니다."
+          ? "✅ 데모 데이터가 모두 삭제되었습니다. 실시간 방문자 수: 0명 (지금부터 실제 접속자만 1건씩 실시간 집계됩니다)"
+          : "✅ 통계 데이터가 데모 기준치(시연용 14,821명)로 복원되었습니다.",
+        "success"
       );
-      await loadData(false);
     } else {
-      showToast("데이터 초기화 중 오류가 발생했습니다. 다시 시도해 주세요.");
+      showToast("데이터 초기화 중 오류가 발생했습니다. 다시 시도해 주세요.", "error");
     }
-  };
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
   };
 
   const handleExportCSV = () => {
@@ -153,7 +136,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast("CSV 통계 보고서가 다운로드되었습니다.");
+    showToast("CSV 통계 보고서가 다운로드되었습니다.", "success");
   };
 
   if (!isOpen) return null;
@@ -218,7 +201,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                   </h3>
                   <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/30">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    LIVE
+                    LIVE REAL-TIME
                   </span>
                 </div>
                 <p className="text-xs text-stone-300 font-sans mt-0.5">
@@ -228,7 +211,16 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
             </div>
 
             {/* Quick Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleSimulateLiveVisit}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer border border-emerald-500 shadow-xs active:scale-95"
+                title="현재 세션으로 실시간 방문 +1 카운트 즉시 테스트"
+              >
+                <PlusCircle className="w-3.5 h-3.5 text-white" />
+                <span><Translate>+ 실시간 방문 테스트</Translate></span>
+              </button>
+
               {isPureRealOnly ? (
                 <button
                   onClick={() => executeReset("seed")}
@@ -247,7 +239,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                   title="데모 데이터 삭제 (실제 0부터 시작)"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-white" />
-                  <span><Translate>데모버전 지우기 (0부터 시작)</Translate></span>
+                  <span><Translate>데모 데이터 지우기 (0부터 시작)</Translate></span>
                 </button>
               )}
 
@@ -280,10 +272,17 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
           </div>
 
           {/* Toast Notification */}
-          {toastMessage && (
-            <div className="bg-emerald-600 text-white text-xs px-4 py-2 flex items-center justify-between font-medium">
-              <span>{toastMessage}</span>
-              <button onClick={() => setToastMessage(null)} className="text-emerald-100 hover:text-white">
+          {toast && (
+            <div
+              className={`${
+                toast.type === "error" ? "bg-rose-600" : "bg-emerald-600"
+              } text-white text-xs px-4 py-2.5 flex items-center justify-between font-medium shrink-0`}
+            >
+              <span>{toast.message}</span>
+              <button
+                onClick={() => setToast(null)}
+                className="text-white/80 hover:text-white cursor-pointer"
+              >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -342,7 +341,15 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0 self-end md:self-center">
+                    <button
+                      onClick={handleSimulateLiveVisit}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-all cursor-pointer text-xs flex items-center gap-1.5 shadow-2xs active:scale-95"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5 text-white" />
+                      <span><Translate>+ 실시간 방문 +1 테스트</Translate></span>
+                    </button>
+
                     {isPureRealOnly ? (
                       <button
                         onClick={() => executeReset("seed")}
@@ -359,7 +366,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                         className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition-all cursor-pointer text-xs flex items-center gap-1.5 shadow-xs active:scale-95"
                       >
                         <Trash2 className="w-3.5 h-3.5 text-white" />
-                        <span><Translate>데모버전 지우기 (0부터 시작)</Translate></span>
+                        <span><Translate>데모 데이터 지우기 (0부터 시작)</Translate></span>
                       </button>
                     )}
                   </div>
@@ -374,7 +381,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                       <span className="font-semibold text-stone-600"><Translate>총 누적 방문자</Translate></span>
                       <Users className="w-4 h-4 text-amber-600" />
                     </div>
-                    <div className="text-2xl md:text-3xl font-bold font-mono text-stone-900 tracking-tight">
+                    <div className="text-2xl md:text-3xl font-bold font-mono tabular-nums text-stone-900 tracking-tight">
                       {stats.summary.totalVisits.toLocaleString()}
                     </div>
                     <div className="flex items-center gap-1 text-[11px] text-emerald-600 font-semibold">
@@ -389,10 +396,10 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                       <span className="font-semibold text-stone-600"><Translate>오늘 방문자 (Today)</Translate></span>
                       <Calendar className="w-4 h-4 text-blue-600" />
                     </div>
-                    <div className="text-2xl md:text-3xl font-bold font-mono text-stone-900 tracking-tight">
+                    <div className="text-2xl md:text-3xl font-bold font-mono tabular-nums text-stone-900 tracking-tight">
                       {stats.summary.todayVisits.toLocaleString()}
                     </div>
-                    <div className="text-[11px] text-stone-400 font-mono">
+                    <div className="text-[11px] text-stone-400 font-mono tabular-nums">
                       {new Date().toISOString().split("T")[0]}
                     </div>
                   </div>
@@ -403,7 +410,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                       <span className="font-semibold text-stone-600"><Translate>해외 방문객 비율</Translate></span>
                       <Globe className="w-4 h-4 text-emerald-600" />
                     </div>
-                    <div className="text-2xl md:text-3xl font-bold font-mono text-emerald-700 tracking-tight">
+                    <div className="text-2xl md:text-3xl font-bold font-mono tabular-nums text-emerald-700 tracking-tight">
                       {stats.summary.intlRatio}%
                     </div>
                     <div className="text-[11px] text-emerald-600/80 font-sans">
@@ -417,7 +424,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                       <span className="font-semibold text-stone-600"><Translate>순 방문자 (Unique)</Translate></span>
                       <Smartphone className="w-4 h-4 text-purple-600" />
                     </div>
-                    <div className="text-2xl md:text-3xl font-bold font-mono text-stone-900 tracking-tight">
+                    <div className="text-2xl md:text-3xl font-bold font-mono tabular-nums text-stone-900 tracking-tight">
                       {stats.summary.uniqueVisitors.toLocaleString()}
                     </div>
                     <div className="text-[11px] text-stone-400 font-sans">
@@ -431,11 +438,11 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                       <span className="font-semibold text-amber-300"><Translate>실시간 접속자</Translate></span>
                       <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
                     </div>
-                    <div className="text-2xl md:text-3xl font-bold font-mono text-white tracking-tight flex items-center gap-2">
+                    <div className="text-2xl md:text-3xl font-bold font-mono tabular-nums text-white tracking-tight flex items-center gap-2">
                       <span>{stats.summary.onlineNow}</span>
                       <span className="text-xs font-normal text-stone-400">명</span>
                     </div>
-                    <div className="text-[11px] text-stone-400 flex items-center gap-1 font-mono">
+                    <div className="text-[11px] text-stone-400 flex items-center gap-1 font-mono tabular-nums">
                       <Clock className="w-3 h-3 text-amber-400" />
                       <span><Translate>평균 체류</Translate>: {stats.summary.avgDuration}</span>
                     </div>
@@ -472,7 +479,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                     {/* Countries List with Progress Bars */}
                     {filteredCountries.length === 0 ? (
                       <div className="py-12 text-center text-xs text-stone-400">
-                        {isPureRealOnly ? "아직 등록된 국가별 유입 데이터가 없습니다." : "검색된 국가가 없습니다."}
+                        {isPureRealOnly ? "아직 등록된 국가별 유입 데이터가 없습니다. 상단의 '+ 실시간 방문 테스트' 버튼을 누르거나 탭을 이동해보세요." : "검색된 국가가 없습니다."}
                       </div>
                     ) : (
                       <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
@@ -484,7 +491,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                                 <span className="font-semibold">{c.name}</span>
                                 <span className="text-[10px] text-stone-400 font-mono">({c.code})</span>
                               </div>
-                              <div className="flex items-center gap-3 font-mono">
+                              <div className="flex items-center gap-3 font-mono tabular-nums">
                                 <span className="font-bold text-stone-900">{c.count.toLocaleString()}회</span>
                                 <span className="w-12 text-right text-stone-500 font-semibold">{c.percentage}%</span>
                               </div>

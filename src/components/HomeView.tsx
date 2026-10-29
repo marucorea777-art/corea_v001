@@ -467,10 +467,10 @@ export default function HomeView({ setActiveTab, onOpenShareModal }: HomeViewPro
             {onOpenShareModal && (
               <button
                 onClick={onOpenShareModal}
-                className="w-full py-3 px-5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg hover:scale-[1.02]"
+                className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-stone-950 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg hover:scale-[1.02] active:scale-95 border border-amber-300/40"
               >
-                <Share2 className="w-4 h-4" />
-                <span><Translate>Share & Invite Friends (WhatsApp, X, Reddit)</Translate></span>
+                <Globe className="w-4 h-4 text-stone-950" />
+                <span><Translate>전세계 홍보 & 바이럴 키트 (WhatsApp, Reddit, 𝕏, 포스터)</Translate></span>
               </button>
             )}
 

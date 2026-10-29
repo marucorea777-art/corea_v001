@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Compass, BookOpen, Utensils, MapPin, CalendarDays, PlaneLanding, ChevronDown, Share2 } from "lucide-react";
+import { Compass, BookOpen, Utensils, MapPin, CalendarDays, PlaneLanding, ChevronDown, Share2, Globe } from "lucide-react";
 import { motion } from "motion/react";
 import { useTranslation, LANGUAGES, LanguageCode, Translate } from "../context/LanguageContext";
 import KoreaLogoIcon from "./KoreaLogoIcon";
@@ -107,11 +107,11 @@ export default function Navbar({ activeTab, setActiveTab, onOpenShareModal }: Na
             {onOpenShareModal && (
               <button
                 onClick={onOpenShareModal}
-                title="Share corea-labs.com with travelers worldwide"
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200/90 bg-white hover:bg-stone-50 text-stone-700 hover:text-stone-900 transition-colors text-xs font-medium rounded-full cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
+                title="Share and promote corea-labs.com with travelers worldwide"
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-300/80 bg-amber-50/80 hover:bg-amber-100 text-amber-950 transition-colors text-xs font-semibold rounded-full cursor-pointer shadow-2xs whitespace-nowrap shrink-0 active:scale-95"
               >
-                <Share2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span className="text-[11px] font-semibold whitespace-nowrap"><Translate>공유 & 초대</Translate></span>
+                <Globe className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span className="text-[11px] font-bold whitespace-nowrap"><Translate>전세계 홍보</Translate></span>
               </button>
             )}
 
