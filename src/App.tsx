@@ -149,6 +149,10 @@ function MainApp() {
       <AdminAnalyticsDashboard
         isOpen={showAnalyticsModal}
         onClose={() => setShowAnalyticsModal(false)}
+        onOpenPromote={() => {
+          setShowAnalyticsModal(false);
+          setIsShareModalOpen(true);
+        }}
       />
 
       {/* Global Admin Login Modal */}

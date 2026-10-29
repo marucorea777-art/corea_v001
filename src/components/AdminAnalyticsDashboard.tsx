@@ -38,9 +38,10 @@ import { Translate, useTranslation } from "../context/LanguageContext";
 interface AdminAnalyticsDashboardProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenPromote?: () => void;
 }
 
-export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyticsDashboardProps) {
+export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote }: AdminAnalyticsDashboardProps) {
   const { language } = useTranslation();
   const [stats, setStats] = useState<AnalyticsStatsResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -94,10 +95,15 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
     setTimeout(() => setToast(null), 3800);
   };
 
-  const handleSimulateLiveVisit = async () => {
-    await trackPageView("home", language, true);
+  const handleSimulateLiveVisit = async (sourceOverride?: string, sourceName?: string) => {
+    await trackPageView("home", language, true, sourceOverride);
     await loadData(false);
-    showToast("✅ 실시간 방문자 +1 카운트가 즉시 반영되었습니다! (오늘 방문자·국가·최근 접속 로그 확인)", "success");
+    showToast(
+      sourceName
+        ? `✅ [${sourceName}] 유입 경로로 실시간 방문자 +1 카운트가 즉시 반영되었습니다!`
+        : "✅ 실시간 방문자 +1 카운트가 즉시 반영되었습니다! (오늘 방문자·유입 경로·최근 접속 로그 확인)",
+      "success"
+    );
   };
 
   const executeReset = async (mode: "zero" | "seed") => {
@@ -212,8 +218,19 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
 
             {/* Quick Actions */}
             <div className="flex flex-wrap items-center gap-2">
+              {onOpenPromote && (
+                <button
+                  onClick={onOpenPromote}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                  title="전 세계 검색엔진·커뮤니티·SNS 홍보 센터 열기"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-stone-950" />
+                  <span><Translate>해외 홍보 & 유입 확대</Translate></span>
+                </button>
+              )}
+
               <button
-                onClick={handleSimulateLiveVisit}
+                onClick={() => handleSimulateLiveVisit()}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer border border-emerald-500 shadow-xs active:scale-95"
                 title="현재 세션으로 실시간 방문 +1 카운트 즉시 테스트"
               >
@@ -343,7 +360,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
 
                   <div className="flex flex-wrap items-center gap-2 shrink-0 self-end md:self-center">
                     <button
-                      onClick={handleSimulateLiveVisit}
+                      onClick={() => handleSimulateLiveVisit()}
                       className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-all cursor-pointer text-xs flex items-center gap-1.5 shadow-2xs active:scale-95"
                     >
                       <PlusCircle className="w-3.5 h-3.5 text-white" />
@@ -747,18 +764,76 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                     </div>
                   </div>
 
-                  {/* Referral Channels */}
-                  <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-xs space-y-3">
-                    <h4 className="font-bold text-stone-900 text-xs uppercase tracking-wider text-stone-500">
-                      <Translate>주요 유입 경로 (Traffic Sources)</Translate>
-                    </h4>
-                    <div className="space-y-2">
-                      {stats.referrers.map((r) => (
-                        <div key={r.name} className="flex items-center justify-between text-xs">
-                          <span className="font-medium text-stone-700 truncate pr-2">{r.name}</span>
-                          <span className="font-mono font-bold text-stone-900">{r.percentage}%</span>
+                  {/* Referral Channels & Traffic Acquisition Deep Analysis */}
+                  <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-xs space-y-3 flex flex-col justify-between">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-stone-900 text-xs uppercase tracking-wider text-stone-500">
+                          <Translate>주요 유입 경로 분석 (Traffic Sources)</Translate>
+                        </h4>
+                        <span className="text-[10px] font-mono bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">
+                          UTM + Referrer
+                        </span>
+                      </div>
+
+                      {stats.referrers.length === 0 ? (
+                        <div className="py-4 text-center text-[11px] text-stone-400">
+                          아래 채널 버튼으로 해외 유입 경로 집계를 테스트해보세요.
                         </div>
-                      ))}
+                      ) : (
+                        <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
+                          {stats.referrers.map((r) => (
+                            <div key={r.name} className="space-y-1">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-medium text-stone-700 truncate pr-2">{r.name}</span>
+                                <span className="font-mono tabular-nums font-bold text-stone-900 shrink-0">
+                                  {r.count.toLocaleString()}회 ({r.percentage}%)
+                                </span>
+                              </div>
+                              <div className="w-full bg-stone-100 h-1.5 rounded-full overflow-hidden">
+                                <div
+                                  style={{ width: `${Math.min(r.percentage, 100)}%` }}
+                                  className="bg-amber-500 h-full rounded-full transition-all duration-300"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quick Channel Acquisition Test & Promote Trigger */}
+                    <div className="pt-3 border-t border-stone-100 space-y-2">
+                      <div className="text-[10px] font-mono text-stone-400 font-semibold">
+                        ⚡ 해외 채널별 실시간 유입 시뮬레이션 (+1):
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { key: "google", label: "Google 검색" },
+                          { key: "reddit", label: "Reddit" },
+                          { key: "chatgpt", label: "ChatGPT·AI" },
+                          { key: "whatsapp", label: "WhatsApp" },
+                          { key: "qrcode", label: "QR 스캔" },
+                        ].map((ch) => (
+                          <button
+                            key={ch.key}
+                            onClick={() => handleSimulateLiveVisit(ch.key, ch.label)}
+                            className="px-2 py-1 rounded-lg bg-stone-100 hover:bg-amber-100 hover:text-amber-900 text-stone-700 text-[10px] font-mono font-semibold transition-colors cursor-pointer"
+                          >
+                            +{ch.label}
+                          </button>
+                        ))}
+                      </div>
+                      {onOpenPromote && (
+                        <button
+                          onClick={onOpenPromote}
+                          className="w-full mt-1 py-2 px-3 rounded-xl bg-stone-900 hover:bg-stone-800 text-amber-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Globe className="w-3.5 h-3.5" />
+                          <span><Translate>해외 홍보 & UTM 추적 링크 생성기 열기</Translate></span>
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -770,13 +845,13 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                     <div>
                       <h4 className="font-bold text-stone-900 text-sm flex items-center gap-2">
                         <Activity className="w-4 h-4 text-emerald-500" />
-                        <Translate>실시간 접속자 로그 (Recent Live Visitors)</Translate>
+                        <Translate>실시간 접속자 및 유입 경로 로그 (Recent Live Visitors & Channels)</Translate>
                       </h4>
                       <p className="text-[11px] text-stone-400">
-                        <Translate>전 세계에서 corea-labs.com으로 유입된 최근 방문 세션</Translate>
+                        <Translate>전 세계에서 corea-labs.com으로 유입된 최근 방문자의 국가, 유입 채널(Referrer/UTM), 방문 섹션</Translate>
                       </p>
                     </div>
-                    <span className="text-[10px] font-mono text-stone-400">
+                    <span className="text-[10px] font-mono tabular-nums text-stone-400">
                       {stats.recentVisitors.length} <Translate>기록</Translate>
                     </span>
                   </div>
@@ -786,6 +861,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                       <thead>
                         <tr className="border-b border-stone-100 text-[11px] text-stone-400 uppercase font-mono">
                           <th className="py-2 px-3">국가 / 위치</th>
+                          <th className="py-2 px-3">유입 경로 (Source / UTM)</th>
                           <th className="py-2 px-3">방문 페이지</th>
                           <th className="py-2 px-3">언어</th>
                           <th className="py-2 px-3">기기</th>
@@ -793,11 +869,16 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-stone-50 font-sans">
-                        {stats.recentVisitors.slice(0, 10).map((v) => (
+                        {stats.recentVisitors.slice(0, 12).map((v) => (
                           <tr key={v.id} className="hover:bg-stone-50/80 transition-colors">
                             <td className="py-2.5 px-3 flex items-center gap-2 font-medium text-stone-800">
                               <span className="text-base">{v.flag}</span>
                               <span>{v.country}</span>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200/70 font-mono text-[11px] font-medium">
+                                {v.referrer || "직접 접속 (Direct / 북마크)"}
+                              </span>
                             </td>
                             <td className="py-2.5 px-3">
                               <span className="px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 font-mono text-[11px]">
@@ -810,7 +891,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose }: AdminAnalyt
                             <td className="py-2.5 px-3 text-stone-600 capitalize">
                               {v.device}
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono text-stone-400 text-[11px]">
+                            <td className="py-2.5 px-3 text-right font-mono tabular-nums text-stone-400 text-[11px]">
                               {new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                             </td>
                           </tr>

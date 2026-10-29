@@ -1,5 +1,27 @@
 User-agent: *
 Allow: /
 
-# Canonical Sitemap for Corea Labs
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+# Canonical Sitemap & AI Search Manifest for Corea Labs
 Sitemap: https://corea-labs.com/sitemap.xml
+# LLMs Manifest: https://corea-labs.com/llms.txt

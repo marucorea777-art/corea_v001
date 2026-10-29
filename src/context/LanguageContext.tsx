@@ -90,11 +90,22 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       // ignore
     }
     try {
-      const saved = localStorage.getItem("corea_labs_lang");
-      return (saved as LanguageCode) || "en";
+      const saved = localStorage.getItem("corea_labs_lang") as LanguageCode | null;
+      if (saved && LANGUAGES.some(l => l.code === saved)) {
+        return saved;
+      }
     } catch {
-      return "en";
+      // ignore
     }
+    try {
+      const browserLang = (navigator.language || "").slice(0, 2).toLowerCase() as LanguageCode;
+      if (LANGUAGES.some(l => l.code === browserLang)) {
+        return browserLang;
+      }
+    } catch {
+      // ignore
+    }
+    return "en";
   });
 
   // Persistent translation cache for dynamic / background AI translations

@@ -267,22 +267,23 @@ function createSeedLedger(): PersistentAnalyticsLedger {
       tablet: { name: "태블릿 (Tablet)", count: 592 },
     },
     referrerStats: {
-      "Google Search": { name: "Google 검색 (자연 유입)", count: 6224 },
-      "Direct / corea-labs.com": { name: "직접 접속 (Direct / 북마크)", count: 3853 },
-      "WhatsApp": { name: "WhatsApp 공유 링크", count: 2075 },
-      "Reddit (r/koreatravel)": { name: "Reddit 커뮤니티", count: 1334 },
-      "X (Twitter)": { name: "X (트위터) 여행 추천", count: 741 },
-      "LINE / Others": { name: "LINE 메신저 및 기타", count: 593 },
+      "Google Search": { name: "Google / 글로벌 검색 (자연 유입)", count: 5624 },
+      "Direct / corea-labs.com": { name: "직접 접속 (Direct / 북마크)", count: 3253 },
+      "WhatsApp": { name: "WhatsApp 글로벌 메신저 공유", count: 1975 },
+      "Reddit (r/koreatravel)": { name: "Reddit (r/koreatravel 커뮤니티)", count: 1534 },
+      "AI Search (ChatGPT / Perplexity)": { name: "AI 검색 추천 (ChatGPT·Perplexity)", count: 1102 },
+      "X (Twitter)": { name: "X (트위터) 글로벌 여행 추천", count: 740 },
+      "LINE / Others": { name: "LINE 메신저 (일본·대만·태국)", count: 593 },
     },
     recentVisitors: [
-      { id: "v_1", timestamp: new Date(Date.now() - 1000 * 45).toISOString(), country: "United States", flag: "🇺🇸", code: "US", path: "festivals", device: "mobile", language: "en", referrer: "direct" },
-      { id: "v_2", timestamp: new Date(Date.now() - 1000 * 120).toISOString(), country: "Japan", flag: "🇯🇵", code: "JP", path: "places", device: "desktop", language: "ja", referrer: "direct" },
-      { id: "v_3", timestamp: new Date(Date.now() - 1000 * 240).toISOString(), country: "France", flag: "🇫🇷", code: "FR", path: "travel", device: "mobile", language: "fr", referrer: "direct" },
-      { id: "v_4", timestamp: new Date(Date.now() - 1000 * 380).toISOString(), country: "United Kingdom", flag: "🇬🇧", code: "GB", path: "festivals", device: "desktop", language: "en", referrer: "direct" },
-      { id: "v_5", timestamp: new Date(Date.now() - 1000 * 520).toISOString(), country: "Taiwan", flag: "🇹🇼", code: "TW", path: "heritage", device: "mobile", language: "zh", referrer: "direct" },
-      { id: "v_6", timestamp: new Date(Date.now() - 1000 * 680).toISOString(), country: "Germany", flag: "🇩🇪", code: "DE", path: "places", device: "mobile", language: "en", referrer: "direct" },
-      { id: "v_7", timestamp: new Date(Date.now() - 1000 * 850).toISOString(), country: "Thailand", flag: "🇹🇭", code: "TH", path: "travel", device: "mobile", language: "th", referrer: "direct" },
-      { id: "v_8", timestamp: new Date(Date.now() - 1000 * 1100).toISOString(), country: "Australia", flag: "🇦🇺", code: "AU", path: "festivals", device: "desktop", language: "en", referrer: "direct" },
+      { id: "v_1", timestamp: new Date(Date.now() - 1000 * 45).toISOString(), country: "United States", flag: "🇺🇸", code: "US", path: "festivals", device: "mobile", language: "en", referrer: "Google / 글로벌 검색 (자연 유입)" },
+      { id: "v_2", timestamp: new Date(Date.now() - 1000 * 120).toISOString(), country: "Japan", flag: "🇯🇵", code: "JP", path: "places", device: "desktop", language: "ja", referrer: "X (트위터) 글로벌 여행 추천" },
+      { id: "v_3", timestamp: new Date(Date.now() - 1000 * 240).toISOString(), country: "France", flag: "🇫🇷", code: "FR", path: "travel", device: "mobile", language: "fr", referrer: "AI 검색 추천 (ChatGPT·Perplexity)" },
+      { id: "v_4", timestamp: new Date(Date.now() - 1000 * 380).toISOString(), country: "United Kingdom", flag: "🇬🇧", code: "GB", path: "festivals", device: "desktop", language: "en", referrer: "Reddit (r/koreatravel 커뮤니티)" },
+      { id: "v_5", timestamp: new Date(Date.now() - 1000 * 520).toISOString(), country: "Taiwan", flag: "🇹🇼", code: "TW", path: "heritage", device: "mobile", language: "zh", referrer: "LINE 메신저 (일본·대만·태국)" },
+      { id: "v_6", timestamp: new Date(Date.now() - 1000 * 680).toISOString(), country: "Germany", flag: "🇩🇪", code: "DE", path: "places", device: "mobile", language: "en", referrer: "WhatsApp 글로벌 메신저 공유" },
+      { id: "v_7", timestamp: new Date(Date.now() - 1000 * 850).toISOString(), country: "Thailand", flag: "🇹🇭", code: "TH", path: "travel", device: "mobile", language: "th", referrer: "Google / 글로벌 검색 (자연 유입)" },
+      { id: "v_8", timestamp: new Date(Date.now() - 1000 * 1100).toISOString(), country: "Australia", flag: "🇦🇺", code: "AU", path: "festivals", device: "desktop", language: "en", referrer: "직접 접속 (Direct / 북마크)" },
     ],
     lastUpdated: Date.now(),
   };
@@ -463,11 +464,99 @@ function getDeviceType(): "mobile" | "tablet" | "desktop" {
   return "desktop";
 }
 
+export function classifyTrafficSource(rawInput: string): { key: string; label: string } {
+  const s = (rawInput || "").toLowerCase().trim();
+  if (!s || s === "direct" || s.includes("corea-labs.com") || s.includes("localhost") || s.includes("run.app")) {
+    return { key: "Direct / corea-labs.com", label: "직접 접속 (Direct / 북마크)" };
+  }
+  if (s.includes("qr") || s.includes("qrcode") || s.includes("poster") || s.includes("flyer")) {
+    return { key: "QR Code Scan", label: "QR 코드 스캔 (포스터·오프라인)" };
+  }
+  if (s.includes("chatgpt") || s.includes("openai") || s.includes("perplexity") || s.includes("claude") || s.includes("gemini") || s.includes("copilot") || s.includes("ai_search")) {
+    return { key: "AI Search (ChatGPT / Perplexity)", label: "AI 검색 추천 (ChatGPT·Perplexity)" };
+  }
+  if (s.includes("google") || s.includes("gclid") || s.includes("bing") || s.includes("duckduckgo") || s.includes("yahoo")) {
+    return { key: "Google Search", label: "Google / 글로벌 검색 (자연 유입)" };
+  }
+  if (s.includes("reddit") || s.includes("redd.it")) {
+    return { key: "Reddit (r/koreatravel)", label: "Reddit (r/koreatravel 커뮤니티)" };
+  }
+  if (s.includes("whatsapp") || s.includes("wa.me")) {
+    return { key: "WhatsApp", label: "WhatsApp 글로벌 메신저 공유" };
+  }
+  if (s.includes("instagram") || s.includes("tiktok") || s.includes("ttclid") || s.includes("ig")) {
+    return { key: "Instagram / TikTok", label: "Instagram · TikTok (글로벌 숏폼)" };
+  }
+  if (s.includes("twitter") || s.includes("x.com") || s.includes("t.co") || s.includes("x_twitter")) {
+    return { key: "X (Twitter)", label: "X (트위터) 글로벌 여행 추천" };
+  }
+  if (s.includes("xiaohongshu") || s.includes("xhs") || s.includes("weibo") || s.includes("baidu")) {
+    return { key: "Xiaohongshu (小红书)", label: "Xiaohongshu (중국 샤오홍슈·웨이보)" };
+  }
+  if (s.includes("line") || s.includes("note.com")) {
+    return { key: "LINE / Others", label: "LINE 메신저 (일본·대만·태국)" };
+  }
+  if (s.includes("pinterest") || s.includes("pin.it") || s.includes("tripadvisor") || s.includes("lonelyplanet")) {
+    return { key: "Pinterest / TripAdvisor", label: "Pinterest · TripAdvisor 여행 포럼" };
+  }
+  if (s.includes("facebook") || s.includes("fb.com") || s.includes("fbclid") || s.includes("telegram") || s.includes("t.me")) {
+    return { key: "Facebook / Telegram", label: "Facebook · Telegram 여행자 그룹" };
+  }
+  return { key: rawInput, label: `${rawInput} (외부 추천 링크)` };
+}
+
+function detectCurrentTrafficSource(overrideSource?: string): { key: string; label: string } {
+  if (overrideSource) {
+    return classifyTrafficSource(overrideSource);
+  }
+  if (typeof window === "undefined") {
+    return { key: "Direct / corea-labs.com", label: "직접 접속 (Direct / 북마크)" };
+  }
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const utmSource = params.get("utm_source") || params.get("ref") || params.get("source");
+    if (utmSource) {
+      const classified = classifyTrafficSource(utmSource);
+      try {
+        sessionStorage.setItem("corea_labs_entry_source", classified.key);
+      } catch {}
+      return classified;
+    }
+    if (params.get("gclid")) return classifyTrafficSource("google");
+    if (params.get("fbclid")) return classifyTrafficSource("facebook");
+    if (params.get("ttclid")) return classifyTrafficSource("tiktok");
+  } catch {}
+
+  try {
+    if (typeof document !== "undefined" && document.referrer) {
+      const refHost = new URL(document.referrer).hostname;
+      if (refHost && !refHost.includes(window.location.hostname)) {
+        const classified = classifyTrafficSource(refHost);
+        try {
+          sessionStorage.setItem("corea_labs_entry_source", classified.key);
+        } catch {}
+        return classified;
+      }
+    }
+  } catch {}
+
+  try {
+    const savedSessionSource = sessionStorage.getItem("corea_labs_entry_source");
+    if (savedSessionSource) {
+      return classifyTrafficSource(savedSessionSource);
+    }
+  } catch {}
+
+  return { key: "Direct / corea-labs.com", label: "직접 접속 (Direct / 북마크)" };
+}
+
 function recordVisitInBrowserLedger(params: {
   sessionId: string;
   language: string;
   path: string;
-  referrer: string;
+  referrerKey: string;
+  referrerLabel: string;
   timezone: string;
   device: "mobile" | "tablet" | "desktop";
 }): AnalyticsStatsResponse {
@@ -539,12 +628,13 @@ function recordVisitInBrowserLedger(params: {
     ledger.deviceStats[dKey].count += 1;
   }
 
-  // 8. Referrer stats
-  const refKey = params.referrer && params.referrer !== "direct" ? params.referrer : "Direct / corea-labs.com";
+  // 8. Referrer / Acquisition Channel stats
+  const refKey = params.referrerKey || "Direct / corea-labs.com";
+  const refLabel = params.referrerLabel || "직접 접속 (Direct / 북마크)";
   if (!ledger.referrerStats) ledger.referrerStats = {};
   if (!ledger.referrerStats[refKey]) {
     ledger.referrerStats[refKey] = {
-      name: refKey === "Direct / corea-labs.com" ? "직접 접속 (Direct / 북마크)" : refKey,
+      name: refLabel,
       count: 1,
     };
   } else {
@@ -562,7 +652,7 @@ function recordVisitInBrowserLedger(params: {
     path: pKey,
     device: dKey,
     language: langKey,
-    referrer: params.referrer || "direct",
+    referrer: refLabel,
   });
   if (ledger.recentVisitors.length > 50) {
     ledger.recentVisitors = ledger.recentVisitors.slice(0, 50);
@@ -574,7 +664,12 @@ function recordVisitInBrowserLedger(params: {
 let lastTrackedKey = "";
 let lastTrackedTime = 0;
 
-export async function trackPageView(page: string, language: string = "en", force: boolean = false): Promise<AnalyticsStatsResponse | null> {
+export async function trackPageView(
+  page: string,
+  language: string = "en",
+  force: boolean = false,
+  overrideSource?: string
+): Promise<AnalyticsStatsResponse | null> {
   try {
     const now = Date.now();
     const trackKey = `${page}:${language}`;
@@ -589,19 +684,15 @@ export async function trackPageView(page: string, language: string = "en", force
       : getSessionId();
     const device = getDeviceType();
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    let referrer = "direct";
-    try {
-      if (typeof document !== "undefined" && document.referrer) {
-        referrer = new URL(document.referrer).hostname || "direct";
-      }
-    } catch {}
+    const channel = detectCurrentTrafficSource(overrideSource);
 
     // 1. Always record immediately in the Browser Real-Time Ledger (100% reliable on Cloudflare static hosting)
     const updatedStats = recordVisitInBrowserLedger({
       sessionId,
       language,
       path: page,
-      referrer,
+      referrerKey: channel.key,
+      referrerLabel: channel.label,
       timezone,
       device,
     });
@@ -615,7 +706,7 @@ export async function trackPageView(page: string, language: string = "en", force
           sessionId,
           language,
           path: page,
-          referrer,
+          referrer: channel.key,
           timezone,
           device,
         }),
