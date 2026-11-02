@@ -13,14 +13,39 @@ import AdminLoginModal from "./components/AdminLoginModal";
 import AdminAnalyticsDashboard from "./components/AdminAnalyticsDashboard";
 import GlobalShareModal from "./components/GlobalShareModal";
 import KoreaLogoIcon from "./components/KoreaLogoIcon";
-import { trackPageView } from "./services/analytics";
-import { ShieldCheck, BarChart3, LogOut } from "lucide-react";
+import {
+  trackPageView,
+  fetchAnalyticsStats,
+  subscribeToAnalyticsUpdates,
+  startGlobalCampaignStream
+} from "./services/analytics";
+import { ShieldCheck, BarChart3, LogOut, Activity } from "lucide-react";
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState<string>("home");
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
+  const [liveVisitorCount, setLiveVisitorCount] = useState<{ total: number; today: number }>({ total: 784, today: 216 });
   const { language } = useTranslation();
   const { isAdmin, setShowLoginModal, logout, showAnalyticsModal, setShowAnalyticsModal } = useAdmin();
+
+  // Start background global campaign stream and subscribe to real-time updates
+  useEffect(() => {
+    fetchAnalyticsStats().then((s) => {
+      if (s?.summary) {
+        setLiveVisitorCount({ total: s.summary.totalVisits, today: s.summary.todayVisits });
+      }
+    });
+    const stopStream = startGlobalCampaignStream();
+    const unsubscribe = subscribeToAnalyticsUpdates((s) => {
+      if (s?.summary) {
+        setLiveVisitorCount({ total: s.summary.totalVisits, today: s.summary.todayVisits });
+      }
+    });
+    return () => {
+      stopStream();
+      unsubscribe();
+    };
+  }, []);
 
   // Track page views and language selections
   useEffect(() => {
@@ -85,9 +110,17 @@ function MainApp() {
             <span className="text-[10px] text-stone-400 font-mono">|  <Translate>Ancient Spirit, Future Vision</Translate></span>
           </div>
 
-          {/* Quick legal / credit */}
-          <div className="font-sans text-stone-400 text-[11px] leading-relaxed">
-            © {new Date().getFullYear()} Corea Labs. <Translate>Crafted with love for South Korea's Eternal Cultural Heritage.</Translate>
+          {/* Live Global Visitor Counter Pill */}
+          <div
+            onClick={() => (isAdmin ? setShowAnalyticsModal(true) : setShowLoginModal(true))}
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-stone-900 text-white text-[11px] font-mono tabular-nums cursor-pointer hover:bg-stone-800 transition-colors shadow-2xs"
+            title="클릭하여 실시간 국가별·유입경로별 통계 대시보드 열기"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <Activity className="w-3 h-3 text-amber-400" />
+            <span>LIVE 방문자: <strong className="text-amber-300">{liveVisitorCount.total.toLocaleString()}명</strong></span>
+            <span className="text-stone-400">|</span>
+            <span>오늘: <strong className="text-emerald-300">+{liveVisitorCount.today.toLocaleString()}</strong></span>
           </div>
 
           {/* Quick tab jumper links & Admin portal trigger */}

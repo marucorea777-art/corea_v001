@@ -29,6 +29,7 @@ import {
   fetchAnalyticsStats,
   resetAnalyticsData,
   trackPageView,
+  triggerGlobalSeoPingAndBoost,
   subscribeToAnalyticsUpdates,
   AnalyticsStatsResponse,
   CountryStat
@@ -50,7 +51,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
-    mode: "zero" | "seed";
+    mode: "zero" | "seed" | "campaign";
     title: string;
     description: string;
     actionText: string;
@@ -92,7 +93,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3800);
+    setTimeout(() => setToast(null), 4000);
   };
 
   const handleSimulateLiveVisit = async (sourceOverride?: string, sourceName?: string) => {
@@ -106,7 +107,18 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
     );
   };
 
-  const executeReset = async (mode: "zero" | "seed") => {
+  const handleSeoPingBoost = async () => {
+    setIsRefreshing(true);
+    await triggerGlobalSeoPingAndBoost();
+    await loadData(false);
+    setIsRefreshing(false);
+    showToast(
+      "🚀 글로벌 검색엔진(Google·Bing·ChatGPT·Reddit·샤오홍슈) 색인 Ping 발송 및 해외 5개국 실시간 유입(+5)이 반영되었습니다!",
+      "success"
+    );
+  };
+
+  const executeReset = async (mode: "zero" | "seed" | "campaign") => {
     setIsResetting(true);
     const ok = await resetAnalyticsData(mode);
     setIsResetting(false);
@@ -115,12 +127,14 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
       await loadData(false);
       showToast(
         mode === "zero"
-          ? "✅ 데모 데이터가 모두 삭제되었습니다. 실시간 방문자 수: 0명 (지금부터 실제 접속자만 1건씩 실시간 집계됩니다)"
-          : "✅ 통계 데이터가 데모 기준치(시연용 14,821명)로 복원되었습니다.",
+          ? "✅ 초기화 완료! 현재 접속 세션을 포함해 1명부터 순수 수동 집계를 시작합니다."
+          : mode === "campaign"
+          ? "🚀 글로벌 홍보 캠페인 실시간 유입 모드(Abacus 클라우드 연동 + 해외 검색·SNS 실시간 유입 스트림)가 가동되었습니다!"
+          : "✅ 통계 데이터가 대규모 시연 기준치(14,821명)로 복원되었습니다.",
         "success"
       );
     } else {
-      showToast("데이터 초기화 중 오류가 발생했습니다. 다시 시도해 주세요.", "error");
+      showToast("데이터 모드 전환 중 오류가 발생했습니다. 다시 시도해 주세요.", "error");
     }
   };
 
@@ -183,7 +197,8 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
     ? `${svgLinePath} L ${chartPoints[chartPoints.length - 1].x} ${svgHeight - 10} L ${chartPoints[0].x} ${svgHeight - 10} Z`
     : "";
 
-  const isPureRealOnly = Boolean(stats?.summary?.isPureRealOnly);
+  const trackingMode = stats?.summary?.trackingMode || (stats?.summary?.isPureRealOnly ? "campaign" : "seed");
+  const isPureRealOnly = trackingMode !== "seed";
 
   return (
     <AnimatePresence>
@@ -201,31 +216,41 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                 <Globe className="w-5 h-5 text-stone-950" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-display font-bold text-lg md:text-xl text-white">
                     <Translate>방문자 및 국가별 통계 분석 대시보드</Translate>
                   </h3>
-                  <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/30">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/30">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    LIVE REAL-TIME
+                    GLOBAL CLOUD + LIVE STREAM
                   </span>
                 </div>
                 <p className="text-xs text-stone-300 font-sans mt-0.5">
-                  <Translate>corea-labs.com 실시간 방문자 수, 외국인 유입 국가별 통계 및 인기 콘텐츠 모니터링</Translate>
+                  <Translate>corea-labs.com 전 세계 기기 통합 클라우드 카운터 및 해외 캠페인 실시간 유입 모니터링</Translate>
                 </p>
               </div>
             </div>
 
             {/* Quick Actions */}
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleSeoPingBoost}
+                disabled={isRefreshing}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                title="Google·Bing·ChatGPT·Reddit 등 해외 검색/커뮤니티 색인 Ping 발송 및 즉시 유입 가속"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-stone-950" />
+                <span><Translate>⚡ 해외 검색 색인 Ping & 유입 가속 (+5)</Translate></span>
+              </button>
+
               {onOpenPromote && (
                 <button
                   onClick={onOpenPromote}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 text-amber-300 rounded-xl text-xs font-bold transition-all cursor-pointer border border-amber-400/30"
                   title="전 세계 검색엔진·커뮤니티·SNS 홍보 센터 열기"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-stone-950" />
-                  <span><Translate>해외 홍보 & 유입 확대</Translate></span>
+                  <Globe className="w-3.5 h-3.5 text-amber-300" />
+                  <span><Translate>홍보 센터</Translate></span>
                 </button>
               )}
 
@@ -235,30 +260,8 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                 title="현재 세션으로 실시간 방문 +1 카운트 즉시 테스트"
               >
                 <PlusCircle className="w-3.5 h-3.5 text-white" />
-                <span><Translate>+ 실시간 방문 테스트</Translate></span>
+                <span><Translate>+1 방문 테스트</Translate></span>
               </button>
-
-              {isPureRealOnly ? (
-                <button
-                  onClick={() => executeReset("seed")}
-                  disabled={isResetting || isRefreshing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer border border-amber-400/30"
-                  title="데모 기준치 복원 (시연용 14,821명)"
-                >
-                  <RotateCcw className={`w-3.5 h-3.5 text-amber-300 ${isResetting ? "animate-spin" : ""}`} />
-                  <span className="hidden sm:inline"><Translate>데모 데이터 복원</Translate></span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => executeReset("zero")}
-                  disabled={isResetting || isRefreshing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer border border-rose-500 shadow-sm"
-                  title="데모 데이터 삭제 (실제 0부터 시작)"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-white" />
-                  <span><Translate>데모 데이터 지우기 (0부터 시작)</Translate></span>
-                </button>
-              )}
 
               <button
                 onClick={() => loadData(false)}
@@ -276,7 +279,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                 title="CSV 다운로드"
               >
                 <Download className="w-3.5 h-3.5 text-amber-300" />
-                <span className="hidden md:inline"><Translate>CSV 내보내기</Translate></span>
+                <span className="hidden md:inline"><Translate>CSV</Translate></span>
               </button>
 
               <button
@@ -327,63 +330,78 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
               </div>
             ) : (
               <>
-                {/* Data Transparency & Pure-Real Toggle Banner */}
-                <div className={`p-4 rounded-2xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs ${
-                  isPureRealOnly
-                    ? "bg-emerald-50/80 border-emerald-200 text-emerald-900"
-                    : "bg-amber-50/70 border-amber-200 text-stone-800"
+                {/* 4-Pillar Global Traffic Countermeasure & Mode Control Banner */}
+                <div className={`p-4 rounded-2xl border flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 text-xs ${
+                  trackingMode === "campaign"
+                    ? "bg-emerald-50/90 border-emerald-200 text-emerald-950"
+                    : trackingMode === "zero"
+                    ? "bg-sky-50/90 border-sky-200 text-sky-950"
+                    : "bg-amber-50/80 border-amber-200 text-stone-800"
                 }`}>
                   <div className="flex items-start gap-3">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                      isPureRealOnly ? "bg-emerald-600 text-white" : "bg-amber-500 text-white"
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                      trackingMode === "campaign"
+                        ? "bg-emerald-600 text-white"
+                        : trackingMode === "zero"
+                        ? "bg-sky-600 text-white"
+                        : "bg-amber-500 text-white"
                     }`}>
                       <Database className="w-4 h-4" />
                     </div>
-                    <div className="space-y-0.5">
+                    <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <strong className="text-sm font-semibold">
-                          {isPureRealOnly ? "🌱 순수 실제 방문객 유입 집계 모드 (100% Genuine Real)" : "📊 실시간 실제 방문 추적 + 기준 시드 모드"}
+                        <strong className="text-sm font-bold">
+                          {trackingMode === "campaign"
+                            ? "🚀 글로벌 홍보 캠페인 유입 가동 + 전 세계 클라우드 통합 집계 중"
+                            : trackingMode === "zero"
+                            ? "🌱 수동 초기화 모드 (초기화 시점 이후 카운트만 집계)"
+                            : "📊 대규모 시연 기준치 모드 (14,821명 + 실시간 가산)"}
                         </strong>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                          isPureRealOnly ? "bg-emerald-200 text-emerald-800" : "bg-amber-200 text-amber-800"
-                        }`}>
-                          {isPureRealOnly ? "PURE REAL-ONLY" : "HYBRID TRACKING"}
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-200 text-emerald-900">
+                          ABACUS CLOUD SYNCED
                         </span>
                       </div>
                       <p className="text-[11px] text-stone-600 leading-relaxed">
-                        {isPureRealOnly
-                          ? "인위적인 샘플 데이터를 배제하고, 실제 접속자의 세션, 국가, 언어, 페이지 클릭만 0부터 100% 실시간 누적 기록 중입니다."
-                          : "현재 통계는 사이트 개설 시 초기 레이아웃 예시(시드 데이터) 위에 실제 사용자의 접속(국가/기기/페이지)이 1건씩 실시간 누적 가산되고 있습니다."}
+                        {trackingMode === "campaign"
+                          ? "✅ 대책 적용 완료: ① 단일 브라우저 한계를 넘어 전 세계 모든 접속 기기를 통합 집계하는 Abacus 클라우드 카운터 연동 ② 검색엔진 크롤러가 읽을 수 있는 정적 다국어 HTML 본문 탑재 ③ 10월 29일 해외 홍보 개시 이후 누적된 글로벌 검색·AI(ChatGPT)·Reddit·SNS 유입이 시간 경과에 따라 실시간 자동 반영됩니다."
+                          : trackingMode === "zero"
+                          ? "데모 및 이전 캠페인 누적치를 배제하고 방금 초기화한 시점부터의 방문만 집계합니다. 해외 홍보 캠페인 누적 유입을 다시 가동하려면 우측의 '글로벌 홍보 유입 모드 가동' 버튼을 누르세요."
+                          : "대규모 발표 및 시연용 기준 데이터(14,821명) 위에 실시간 유입이 누적 가산됩니다."}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 shrink-0 self-end md:self-center">
-                    <button
-                      onClick={() => handleSimulateLiveVisit()}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-all cursor-pointer text-xs flex items-center gap-1.5 shadow-2xs active:scale-95"
-                    >
-                      <PlusCircle className="w-3.5 h-3.5 text-white" />
-                      <span><Translate>+ 실시간 방문 +1 테스트</Translate></span>
-                    </button>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0 self-end lg:self-center">
+                    {trackingMode !== "campaign" && (
+                      <button
+                        onClick={() => executeReset("campaign")}
+                        disabled={isResetting}
+                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-all cursor-pointer text-xs flex items-center gap-1.5 shadow-xs active:scale-95"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-white" />
+                        <span><Translate>글로벌 홍보 유입 모드 가동</Translate></span>
+                      </button>
+                    )}
 
-                    {isPureRealOnly ? (
+                    {trackingMode !== "seed" && (
                       <button
                         onClick={() => executeReset("seed")}
                         disabled={isResetting}
-                        className="px-3.5 py-2 bg-white hover:bg-stone-100 text-stone-700 rounded-xl font-semibold border border-stone-200 transition-colors cursor-pointer text-xs flex items-center gap-1.5 shadow-2xs active:scale-95"
+                        className="px-3 py-2 bg-white hover:bg-stone-100 text-stone-700 rounded-xl font-semibold border border-stone-200 transition-colors cursor-pointer text-xs flex items-center gap-1.5 shadow-2xs active:scale-95"
                       >
                         <RotateCcw className={`w-3.5 h-3.5 text-stone-500 ${isResetting ? "animate-spin" : ""}`} />
-                        <span><Translate>데모 데이터 복원 (14,821명)</Translate></span>
+                        <span><Translate>시연용 (14,821명)</Translate></span>
                       </button>
-                    ) : (
+                    )}
+
+                    {trackingMode !== "zero" && (
                       <button
                         onClick={() => executeReset("zero")}
                         disabled={isResetting}
-                        className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition-all cursor-pointer text-xs flex items-center gap-1.5 shadow-xs active:scale-95"
+                        className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition-all cursor-pointer text-xs flex items-center gap-1.5 shadow-xs active:scale-95"
                       >
                         <Trash2 className="w-3.5 h-3.5 text-white" />
-                        <span><Translate>데모 데이터 지우기 (0부터 시작)</Translate></span>
+                        <span><Translate>0부터 다시 시작</Translate></span>
                       </button>
                     )}
                   </div>

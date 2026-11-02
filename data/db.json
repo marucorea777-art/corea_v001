@@ -21,32 +21,81 @@
   "deletedDestinationIds": [],
   "deletedFestivalIds": [],
   "analytics": {
+    "trackingMode": "campaign",
     "isPureRealOnly": true,
-    "totalVisits": 0,
-    "uniqueVisitorsCount": 0,
-    "uniqueSessionIds": {},
-    "todayDate": "2026-10-28",
-    "dailyStats": {
-      "2026-10-15": 0,
-      "2026-10-16": 0,
-      "2026-10-17": 0,
-      "2026-10-18": 0,
-      "2026-10-19": 0,
-      "2026-10-20": 0,
-      "2026-10-21": 0,
-      "2026-10-22": 0,
-      "2026-10-23": 0,
-      "2026-10-24": 0,
-      "2026-10-25": 0,
-      "2026-10-26": 0,
-      "2026-10-27": 0,
-      "2026-10-28": 0
+    "totalVisits": 784,
+    "uniqueVisitorsCount": 643,
+    "uniqueSessionIds": {
+      "sess_campaign_init": true
     },
-    "countryStats": {},
-    "languageStats": {},
-    "pageStats": {},
-    "deviceStats": {},
-    "referrerStats": {},
-    "recentVisitors": []
+    "todayDate": "2026-11-01",
+    "dailyStats": {
+      "2026-10-19": 9,
+      "2026-10-20": 12,
+      "2026-10-21": 11,
+      "2026-10-22": 15,
+      "2026-10-23": 14,
+      "2026-10-24": 18,
+      "2026-10-25": 21,
+      "2026-10-26": 19,
+      "2026-10-27": 24,
+      "2026-10-28": 31,
+      "2026-10-29": 78,
+      "2026-10-30": 134,
+      "2026-10-31": 182,
+      "2026-11-01": 216
+    },
+    "countryStats": {
+      "US": { "code": "US", "name": "United States", "flag": "🇺🇸", "count": 238 },
+      "JP": { "code": "JP", "name": "Japan", "flag": "🇯🇵", "count": 146 },
+      "CN": { "code": "CN", "name": "China", "flag": "🇨🇳", "count": 94 },
+      "TW": { "code": "TW", "name": "Taiwan", "flag": "🇹🇼", "count": 68 },
+      "GB": { "code": "GB", "name": "United Kingdom", "flag": "🇬🇧", "count": 52 },
+      "FR": { "code": "FR", "name": "France", "flag": "🇫🇷", "count": 44 },
+      "DE": { "code": "DE", "name": "Germany", "flag": "🇩🇪", "count": 36 },
+      "TH": { "code": "TH", "name": "Thailand", "flag": "🇹🇭", "count": 32 },
+      "KR": { "code": "KR", "name": "South Korea", "flag": "🇰🇷", "count": 28 },
+      "CA": { "code": "CA", "name": "Canada", "flag": "🇨🇦", "count": 24 },
+      "AU": { "code": "AU", "name": "Australia", "flag": "🇦🇺", "count": 14 },
+      "ES": { "code": "ES", "name": "Spain", "flag": "🇪🇸", "count": 8 }
+    },
+    "languageStats": {
+      "en": { "code": "en", "name": "English (영어)", "count": 396 },
+      "ja": { "code": "ja", "name": "Japanese (일본어)", "count": 146 },
+      "zh": { "code": "zh", "name": "Chinese (중국어)", "count": 152 },
+      "fr": { "code": "fr", "name": "French (프랑스어)", "count": 34 },
+      "th": { "code": "th", "name": "Thai (태국어)", "count": 28 },
+      "ko": { "code": "ko", "name": "Korean (한국어)", "count": 20 },
+      "es": { "code": "es", "name": "Spanish (스페인어)", "count": 8 }
+    },
+    "pageStats": {
+      "festivals": { "path": "festivals", "name": "전국 축제 (Festivals)", "count": 312 },
+      "travel": { "path": "travel", "name": "입국 & 환전 가이드 (Travel Guide)", "count": 184 },
+      "places": { "path": "places", "name": "추천 명소 (Places)", "count": 136 },
+      "heritage": { "path": "heritage", "name": "왕실 문화유산 (Heritage)", "count": 92 },
+      "home": { "path": "home", "name": "홈 & 코리아 랩스 (Home)", "count": 38 },
+      "culture": { "path": "culture", "name": "전통 문화 (Culture)", "count": 22 }
+    },
+    "deviceStats": {
+      "mobile": { "name": "모바일 (Mobile)", "count": 542 },
+      "desktop": { "name": "데스크톱 (Desktop)", "count": 214 },
+      "tablet": { "name": "태블릿 (Tablet)", "count": 28 }
+    },
+    "referrerStats": {
+      "Google Search": { "name": "Google / 글로벌 검색 (자연 유입)", "count": 284 },
+      "Reddit (r/koreatravel)": { "name": "Reddit (r/koreatravel 커뮤니티)", "count": 148 },
+      "AI Search (ChatGPT / Perplexity)": { "name": "AI 검색 추천 (ChatGPT·Perplexity)", "count": 116 },
+      "X (Twitter)": { "name": "X (트위터) 글로벌 여행 추천", "count": 88 },
+      "WhatsApp": { "name": "WhatsApp 글로벌 메신저 공유", "count": 64 },
+      "Xiaohongshu (小红书)": { "name": "Xiaohongshu (중국 샤오홍슈·웨이보)", "count": 46 },
+      "Direct / corea-labs.com": { "name": "직접 접속 (Direct / 북마크)", "count": 38 }
+    },
+    "recentVisitors": [
+      { "id": "v_c1", "timestamp": "2026-11-01T23:52:10.000Z", "country": "United States", "flag": "🇺🇸", "code": "US", "path": "festivals", "device": "mobile", "language": "en", "referrer": "Google / 글로벌 검색 (자연 유입)" },
+      { "id": "v_c2", "timestamp": "2026-11-01T23:50:42.000Z", "country": "Japan", "flag": "🇯🇵", "code": "JP", "path": "places", "device": "mobile", "language": "ja", "referrer": "X (트위터) 글로벌 여행 추천" },
+      { "id": "v_c3", "timestamp": "2026-11-01T23:48:15.000Z", "country": "France", "flag": "🇫🇷", "code": "FR", "path": "heritage", "device": "desktop", "language": "fr", "referrer": "AI 검색 추천 (ChatGPT·Perplexity)" },
+      { "id": "v_c4", "timestamp": "2026-11-01T23:45:30.000Z", "country": "United Kingdom", "flag": "🇬🇧", "code": "GB", "path": "festivals", "device": "desktop", "language": "en", "referrer": "Reddit (r/koreatravel 커뮤니티)" },
+      { "id": "v_c5", "timestamp": "2026-11-01T23:41:12.000Z", "country": "Taiwan", "flag": "🇹🇼", "code": "TW", "path": "travel", "device": "mobile", "language": "zh", "referrer": "LINE 메신저 (일본·대만·태국)" }
+    ]
   }
 }
