@@ -120,13 +120,25 @@ export default function FestivalsView() {
     localStorage.setItem("corea_labs_wishlist", JSON.stringify(updated));
   };
 
-  // Filter default presets by deleted IDs
-  const activeDefaultFestivals = useMemo(() => {
-    return FESTIVALS.filter((f) => !deletedIds.includes(f.id));
-  }, [deletedIds]);
+  // Combine standard and custom festivals before translation so custom cards also support multi-language view
+  const combinedBaseFestivals = useMemo(() => {
+    const activeDefaults = FESTIVALS.filter((f) => !deletedIds.includes(f.id));
+    const activeCustom = customFestivals.filter((f) => !deletedIds.includes(f.id));
+    const customMap = new Map<string, Festival>(activeCustom.map((f) => [f.id, f]));
 
-  // Translate standard festivals on the fly
-  const { translatedData: translatedFESTIVALS } = useTranslatedData(activeDefaultFestivals, [
+    const resolvedDefaults = activeDefaults.map((df) => {
+      const customOverride = customMap.get(df.id);
+      return customOverride ? { ...df, ...customOverride, image: customOverride.image || df.image } : df;
+    });
+
+    const defaultIds = new Set<string>(activeDefaults.map((df) => df.id));
+    const pureCustom = activeCustom.filter((cf) => !defaultIds.has(cf.id));
+
+    return [...resolvedDefaults, ...pureCustom];
+  }, [customFestivals, deletedIds]);
+
+  // Translate all festivals on the fly while preserving custom images
+  const { translatedData: translatedFESTIVALS } = useTranslatedData(combinedBaseFestivals, [
     "name",
     "location",
     "dateRange",
@@ -135,20 +147,14 @@ export default function FestivalsView() {
     "features",
   ]);
 
-  // Combine standard and custom festivals, letting edited versions in customFestivals override default ones!
+  // Ensure custom image URLs/uploads are strictly preserved
   const allFestivals = useMemo(() => {
-    const activeCustom = customFestivals.filter((f) => !deletedIds.includes(f.id));
-    const customMap = new Map(activeCustom.map((f) => [f.id, f]));
-
-    // If an existing default festival was edited, replace it with the custom edited version
-    const resolvedDefaults = translatedFESTIVALS.map((df) => customMap.get(df.id) || df);
-    
-    // Add custom festivals whose ID is not already among default festivals
-    const defaultIds = new Set(translatedFESTIVALS.map((df) => df.id));
-    const pureCustom = activeCustom.filter((cf) => !defaultIds.has(cf.id));
-
-    return [...resolvedDefaults, ...pureCustom];
-  }, [translatedFESTIVALS, customFestivals, deletedIds]);
+    const customImageMap = new Map<string, string>(customFestivals.map((f) => [f.id, f.image]));
+    return translatedFESTIVALS.map((f) => {
+      const customImg = customImageMap.get(f.id);
+      return customImg ? { ...f, image: customImg } : f;
+    });
+  }, [translatedFESTIVALS, customFestivals]);
 
   // Filtering Logic
   const filteredFestivals = allFestivals.filter((fest) => {

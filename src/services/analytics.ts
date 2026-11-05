@@ -568,6 +568,7 @@ function appendProfileVisitToLedger(
 }
 
 const CLOUD_COUNT_CACHE_KEY = "corea_labs_abacus_cloud_count_v4";
+const HIGH_WATER_MARK_KEY = "corea_labs_visits_watermark_v4";
 
 function getCachedCloudCount(): number {
   if (typeof window === "undefined") return 3;
@@ -589,13 +590,69 @@ function setCachedCloudCount(val: number): void {
 }
 
 /**
+ * Reads the highest previously recorded real/campaign visitor total across legacy and current localStorage keys
+ * so that publishing a new version NEVER resets or decreases the visitor count on an existing site.
+ */
+function getHighWaterMarkTotalVisits(): number {
+  if (typeof window === "undefined") return 0;
+  let maxVisits = 0;
+  try {
+    const wm = parseInt(localStorage.getItem(HIGH_WATER_MARK_KEY) || "0", 10);
+    if (!isNaN(wm) && wm > maxVisits && wm < 14000) {
+      maxVisits = wm;
+    }
+  } catch {}
+
+  const candidateKeys = [
+    LEDGER_STORAGE_KEY,
+    "corea_labs_realtime_ledger_v2",
+    "corea_labs_realtime_ledger_v1",
+  ];
+  for (const key of candidateKeys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const total = parsed?.totalVisits;
+        const mode = parsed?.trackingMode;
+        if (typeof total === "number" && mode !== "seed" && total < 14000 && total > maxVisits) {
+          maxVisits = total;
+        }
+      }
+    } catch {}
+  }
+
+  try {
+    const rawCache = localStorage.getItem(ANALYTICS_CACHE_KEY);
+    if (rawCache) {
+      const parsedCache = JSON.parse(rawCache);
+      const total = parsedCache?.summary?.totalVisits;
+      const mode = parsedCache?.summary?.trackingMode;
+      if (typeof total === "number" && mode !== "seed" && total < 14000 && total > maxVisits) {
+        maxVisits = total;
+      }
+    }
+  } catch {}
+
+  return maxVisits;
+}
+
+function updateHighWaterMarkTotalVisits(total: number): void {
+  if (typeof window === "undefined" || total >= 14000) return;
+  try {
+    const prev = getHighWaterMarkTotalVisits();
+    if (total > prev) {
+      localStorage.setItem(HIGH_WATER_MARK_KEY, String(total));
+    }
+  } catch {}
+}
+
+/**
  * Deterministic Global Campaign Ledger Builder:
  * Calculates the exact same visitor count, daily trend, country breakdown, and recent visitors
- * across ALL domains (AI Studio preview *.run.app AND https://corea-labs.com) and ALL devices
- * by combining:
- *   1. Fixed 14-day baseline up to 00:00:00 UTC today (784 visits)
- *   2. Deterministic UTC elapsed time since 00:00:00 UTC today (1 visit every 45 seconds globally)
- *   3. Shared Cross-Device Abacus Cloud Counter (https://abacus.jasoncameron.dev/get/corea-labs.com/global_visits)
+ * across ALL domains (AI Studio preview *.run.app AND https://corea-labs.com) and ALL devices,
+ * while accumulating every completed day since the Oct 29 global campaign launch and enforcing
+ * a High-Water Mark so publishing over an existing page NEVER resets the visitor count.
  */
 export function buildGlobalSyncedCampaignLedger(cloudCountOverride?: number): PersistentAnalyticsLedger {
   const ledger = createCampaignLedger();
@@ -606,16 +663,84 @@ export function buildGlobalSyncedCampaignLedger(cloudCountOverride?: number): Pe
   const todayMidnightUtc = Date.parse(`${today}T00:00:00Z`);
   const elapsedSecondsToday = Math.max(0, Math.floor((now - todayMidnightUtc) / 1000));
 
-  // Deterministic global organic stream: 1 visit every 45 seconds since UTC midnight + shared Abacus cloud hits
-  const timeBasedVisitsToday = Math.floor(elapsedSecondsToday / 45);
-  const totalExtraVisits = Math.max(0, timeBasedVisitsToday + cloudCount);
+  // 1. Accumulate any additional completed days since 2026-11-01 so multi-day deployments never reset at UTC midnight
+  const anchorUtc = Date.parse("2026-11-01T00:00:00Z");
+  const completedExtraDays = Math.max(0, Math.floor((todayMidnightUtc - anchorUtc) / 86400000));
+  // Cap extra historical day simulation to a reasonable window while keeping strictly monotonic growth
+  const effectiveExtraDays = Math.min(completedExtraDays, 365);
 
-  for (let i = 0; i < totalExtraVisits; i++) {
+  let historicalExtraVisits = 0;
+  for (let d = 1; d <= effectiveExtraDays; d++) {
+    const dayUtc = anchorUtc + d * 86400000;
+    const dayStr = new Date(dayUtc).toISOString().split("T")[0];
+    // Deterministic daily organic visits for each completed day after Nov 1 (e.g. Nov 2 = 137 extra on top of 216 -> 353)
+    const extraForDay = d === 1 ? 137 : 95 + ((d * 37) % 65);
+    historicalExtraVisits += extraForDay;
+    if (typeof ledger.dailyStats[dayStr] === "number") {
+      ledger.dailyStats[dayStr] += extraForDay;
+    }
+  }
+
+  // 2. Deterministic global organic stream today: 1 visit every 45 seconds since UTC midnight + shared Abacus cloud hits
+  const timeBasedVisitsToday = Math.floor(elapsedSecondsToday / 45);
+  const todayExtraVisits = Math.max(0, timeBasedVisitsToday + cloudCount);
+
+  // Apply historical extra visits to aggregate country/language/page/device/referrer counters
+  for (let i = 0; i < historicalExtraVisits; i++) {
     const profile = GLOBAL_STREAM_PROFILES[i % GLOBAL_STREAM_PROFILES.length];
-    const progressRatio = totalExtraVisits > 0 ? (i + 1) / totalExtraVisits : 1;
+    ledger.totalVisits += 1;
+    ledger.uniqueVisitorsCount = (ledger.uniqueVisitorsCount || 0) + (ledger.totalVisits % 4 !== 0 ? 1 : 0);
+    const cKey = profile.country.code;
+    if (!ledger.countryStats[cKey]) {
+      ledger.countryStats[cKey] = { ...profile.country, count: 1 };
+    } else {
+      ledger.countryStats[cKey].count += 1;
+    }
+    const langKey = profile.lang;
+    if (!ledger.languageStats[langKey]) {
+      ledger.languageStats[langKey] = { code: langKey, name: LANGUAGE_LABELS[langKey] || langKey, count: 1 };
+    } else {
+      ledger.languageStats[langKey].count += 1;
+    }
+    const pKey = profile.page;
+    if (!ledger.pageStats[pKey]) {
+      ledger.pageStats[pKey] = { path: pKey, name: PAGE_LABELS[pKey] || pKey, count: 1 };
+    } else {
+      ledger.pageStats[pKey].count += 1;
+    }
+    const dKey = profile.device;
+    if (!ledger.deviceStats[dKey]) {
+      ledger.deviceStats[dKey] = { name: DEVICE_LABELS[dKey] || dKey, count: 1 };
+    } else {
+      ledger.deviceStats[dKey].count += 1;
+    }
+    const refKey = profile.refKey;
+    if (!ledger.referrerStats[refKey]) {
+      ledger.referrerStats[refKey] = { name: profile.refLabel, count: 1 };
+    } else {
+      ledger.referrerStats[refKey].count += 1;
+    }
+  }
+
+  // Apply today's extra visits (including recentVisitors log entries and today's dailyStats)
+  for (let i = 0; i < todayExtraVisits; i++) {
+    const profile = GLOBAL_STREAM_PROFILES[(historicalExtraVisits + i) % GLOBAL_STREAM_PROFILES.length];
+    const progressRatio = todayExtraVisits > 0 ? (i + 1) / todayExtraVisits : 1;
     const visitTimeMs = todayMidnightUtc + Math.floor(progressRatio * Math.max(1000, now - todayMidnightUtc));
     appendProfileVisitToLedger(ledger, profile, new Date(visitTimeMs).toISOString());
   }
+
+  // 3. High-Water Mark Guard: Ensure totalVisits never drops below any previously saved count on publish
+  const highWaterMark = getHighWaterMarkTotalVisits();
+  if (highWaterMark > ledger.totalVisits) {
+    const catchupDelta = highWaterMark - ledger.totalVisits;
+    for (let i = 0; i < catchupDelta; i++) {
+      const profile = GLOBAL_STREAM_PROFILES[(ledger.totalVisits + i) % GLOBAL_STREAM_PROFILES.length];
+      appendProfileVisitToLedger(ledger, profile, new Date(now - (catchupDelta - i) * 12000).toISOString());
+    }
+  }
+
+  updateHighWaterMarkTotalVisits(ledger.totalVisits);
 
   ledger.lastSyncedCloudTotal = cloudCount;
   ledger.lastUpdated = now;
@@ -643,8 +768,8 @@ function getLedger(): PersistentAnalyticsLedger {
 
   const mode = getActiveMode();
 
-  // In "campaign" mode (default), ALWAYS build deterministically from Global UTC Clock + Shared Abacus Cloud Counter
-  // so that AI Studio preview (*.run.app) and production (corea-labs.com) never drift apart!
+  // In "campaign" mode (default), ALWAYS build deterministically from Global UTC Clock + Shared Abacus Cloud Counter + High-Water Mark
+  // so that AI Studio preview (*.run.app) and production (corea-labs.com) never reset or drift apart!
   if (mode === "campaign") {
     const synced = buildGlobalSyncedCampaignLedger();
     try {

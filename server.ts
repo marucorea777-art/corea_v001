@@ -224,6 +224,11 @@ ${JSON.stringify(texts, null, 2)}`;
     res.json(db.destinations || []);
   });
 
+  app.get("/api/destinations/deleted", (_req, res) => {
+    const db = getDb();
+    res.json(db.deletedDestinationIds || []);
+  });
+
   app.post("/api/destinations", (req, res) => {
     const db = getDb();
     const dest = req.body;
@@ -235,8 +240,34 @@ ${JSON.stringify(texts, null, 2)}`;
     }
     dest.isCustom = true;
     db.destinations = [...(db.destinations || []).filter((d: any) => d.id !== dest.id), dest];
+    if (Array.isArray(db.deletedDestinationIds)) {
+      db.deletedDestinationIds = db.deletedDestinationIds.filter((id: string) => id !== dest.id);
+    }
     saveDb(db);
     res.json(dest);
+  });
+
+  app.post("/api/destinations/sync", (req, res) => {
+    const db = getDb();
+    const { items, deletedIds } = req.body || {};
+    if (Array.isArray(deletedIds)) {
+      db.deletedDestinationIds = Array.from(new Set([...(db.deletedDestinationIds || []), ...deletedIds]));
+    }
+    if (Array.isArray(items) && items.length > 0) {
+      const mergedMap = new Map<string, any>();
+      (db.destinations || []).forEach((d: any) => {
+        if (d && d.id) mergedMap.set(d.id, d);
+      });
+      items.forEach((d: any) => {
+        if (d && d.id && d.name) {
+          mergedMap.set(d.id, { ...d, isCustom: true });
+        }
+      });
+      const delSet = new Set(db.deletedDestinationIds || []);
+      db.destinations = Array.from(mergedMap.values()).filter((d: any) => !delSet.has(d.id));
+    }
+    saveDb(db);
+    res.json({ destinations: db.destinations || [], deletedDestinationIds: db.deletedDestinationIds || [] });
   });
 
   app.delete("/api/destinations/:id", (req, res) => {
@@ -257,6 +288,11 @@ ${JSON.stringify(texts, null, 2)}`;
     res.json(db.festivals || []);
   });
 
+  app.get("/api/festivals/deleted", (_req, res) => {
+    const db = getDb();
+    res.json(db.deletedFestivalIds || []);
+  });
+
   app.post("/api/festivals", (req, res) => {
     const db = getDb();
     const fest = req.body;
@@ -268,8 +304,34 @@ ${JSON.stringify(texts, null, 2)}`;
     }
     fest.isCustom = true;
     db.festivals = [...(db.festivals || []).filter((f: any) => f.id !== fest.id), fest];
+    if (Array.isArray(db.deletedFestivalIds)) {
+      db.deletedFestivalIds = db.deletedFestivalIds.filter((id: string) => id !== fest.id);
+    }
     saveDb(db);
     res.json(fest);
+  });
+
+  app.post("/api/festivals/sync", (req, res) => {
+    const db = getDb();
+    const { items, deletedIds } = req.body || {};
+    if (Array.isArray(deletedIds)) {
+      db.deletedFestivalIds = Array.from(new Set([...(db.deletedFestivalIds || []), ...deletedIds]));
+    }
+    if (Array.isArray(items) && items.length > 0) {
+      const mergedMap = new Map<string, any>();
+      (db.festivals || []).forEach((f: any) => {
+        if (f && f.id) mergedMap.set(f.id, f);
+      });
+      items.forEach((f: any) => {
+        if (f && f.id && f.name) {
+          mergedMap.set(f.id, { ...f, isCustom: true });
+        }
+      });
+      const delSet = new Set(db.deletedFestivalIds || []);
+      db.festivals = Array.from(mergedMap.values()).filter((f: any) => !delSet.has(f.id));
+    }
+    saveDb(db);
+    res.json({ festivals: db.festivals || [], deletedFestivalIds: db.deletedFestivalIds || [] });
   });
 
   app.delete("/api/festivals/:id", (req, res) => {
