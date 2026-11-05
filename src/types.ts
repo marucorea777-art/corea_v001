@@ -123,3 +123,27 @@ export interface PostcardLog {
   textColor: string;
   fontStyle: string;
 }
+
+export interface QnaReply {
+  id: string;
+  author: string;
+  countryFlag: string;
+  content: string;
+  createdAt: string;
+  isOfficial?: boolean;
+}
+
+export interface QnaPost {
+  id: string;
+  category: "visa" | "festival" | "finance" | "places" | "general";
+  title: string;
+  content: string;
+  author: string;
+  countryFlag: string;
+  createdAt: string;
+  likes: number;
+  views: number;
+  isPinned?: boolean;
+  replies: QnaReply[];
+}
+

@@ -818,6 +818,125 @@ ${JSON.stringify(texts, null, 2)}`;
     return res.json({ success: true, message: "순수 실제 접속자 데이터(0부터 측정)로 초기화되었습니다.", mode: "zero" });
   });
 
+  // --- Traveler Q&A Board API Routes ---
+  app.get("/api/qna", (_req, res) => {
+    const db = getDb();
+    res.json(db.qnaPosts || []);
+  });
+
+  app.post("/api/qna", (req, res) => {
+    const post = req.body;
+    if (!post || !post.id || !post.title) {
+      return res.status(400).json({ error: "Invalid Q&A post" });
+    }
+    const db = getDb();
+    if (!Array.isArray(db.qnaPosts)) db.qnaPosts = [];
+    db.qnaPosts = [post, ...db.qnaPosts.filter((p: any) => p.id !== post.id)];
+    saveDb(db);
+    res.json(post);
+  });
+
+  app.post("/api/qna/:id/reply", (req, res) => {
+    const { id } = req.params;
+    const reply = req.body;
+    if (!reply || !reply.content) {
+      return res.status(400).json({ error: "Invalid reply" });
+    }
+    const db = getDb();
+    if (!Array.isArray(db.qnaPosts)) db.qnaPosts = [];
+    let updatedPost = null;
+    db.qnaPosts = db.qnaPosts.map((p: any) => {
+      if (p.id === id) {
+        updatedPost = { ...p, replies: [...(p.replies || []), reply] };
+        return updatedPost;
+      }
+      return p;
+    });
+    saveDb(db);
+    res.json(updatedPost || { success: true });
+  });
+
+  app.post("/api/qna/:id/like", (req, res) => {
+    const { id } = req.params;
+    const db = getDb();
+    if (!Array.isArray(db.qnaPosts)) db.qnaPosts = [];
+    let updatedPost = null;
+    db.qnaPosts = db.qnaPosts.map((p: any) => {
+      if (p.id === id) {
+        updatedPost = { ...p, likes: (p.likes || 0) + 1 };
+        return updatedPost;
+      }
+      return p;
+    });
+    saveDb(db);
+    res.json(updatedPost || { success: true });
+  });
+
+  app.delete("/api/qna/:id", (req, res) => {
+    const { id } = req.params;
+    const db = getDb();
+    if (!Array.isArray(db.qnaPosts)) db.qnaPosts = [];
+    db.qnaPosts = db.qnaPosts.filter((p: any) => p.id !== id);
+    saveDb(db);
+    res.json({ success: true });
+  });
+
+  // --- AI Travel Concierge Chatbot Endpoint (/api/chat) ---
+  app.post("/api/chat", async (req, res) => {
+    try {
+      const { message, language, history } = req.body || {};
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ error: "message is required" });
+      }
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(503).json({ fallback: true, error: "GEMINI_API_KEY not configured" });
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey: process.env.GEMINI_API_KEY,
+        httpOptions: {
+          headers: {
+            "User-Agent": "aistudio-build",
+          },
+        },
+      });
+
+      const systemPrompt = `You are the official "Corea Labs Travel Concierge" (코레아 랩스 공식 한국 여행 컨시어지).
+You help domestic and international visitors traveling in South Korea with accurate, warm, practical information about:
+1. Korean seasonal festivals (Jinhae Cherry Blossom, Yeouido Spring Flower, Gurye Sansuyu, Boryeong Mud, Andong Mask Dance, Jinju Namgang Yudeung, Hwacheon Sancheoneo Ice Festival, Busan Fireworks, Seoul Lantern, etc.) and exact public transit directions (KTX, express buses, subway, local buses, free festival shuttle buses).
+2. Entry requirements: K-ETA (apply 72h prior, 10,000 KRW, valid 3 years), Q-Code quarantine QR, arrival cards, and customs limits ($800 USD duty-free, 2L alcohol up to $400, 200 cigarettes, $10,000 USD cash declaration threshold).
+3. Currency exchange & payment: 85% card + 15% cash recommendation, WOWPASS & NAMANE prepaid cards (combined currency exchange + T-money transit card), tax refund.
+4. Royal Palaces (Gyeongbokgung closed Tuesdays; Changdeokgung, Deoksugung, Changgyeonggung closed Mondays; free admission when wearing Hanbok) and UNESCO World Heritage sites.
+5. Emergency & Help: 1330 Korea Travel Hotline (24/7 multilingual interpretation & tourist support), 112 (Police), 119 (Fire/Medical).
+
+Respond concisely (3-6 sentences, using clean bullet points when helpful) in the user's requested language code: "${language || "ko"}".`;
+
+      const recentHistory = Array.isArray(history)
+        ? history
+            .slice(-6)
+            .map((h: any) => `${h.role === "user" ? "Traveler" : "Concierge"}: ${h.text}`)
+            .join("\n")
+        : "";
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: recentHistory ? `${recentHistory}\nTraveler: ${message}` : message,
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.3,
+        },
+      });
+
+      const replyText = response.text?.trim();
+      if (!replyText) {
+        return res.status(503).json({ fallback: true });
+      }
+      return res.json({ reply: replyText });
+    } catch (e: any) {
+      return res.status(503).json({ fallback: true, error: e?.message || "Chat error" });
+    }
+  });
+
   // Explicit Google AdSense ads.txt endpoint
   app.get("/ads.txt", (_req, res) => {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");

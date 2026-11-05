@@ -1,4 +1,4 @@
-import { PostcardLog, Destination, Festival } from "../types";
+import { PostcardLog, Destination, Festival, QnaPost, QnaReply } from "../types";
 
 const STORAGE_POSTCARDS = "corea_labs_postcards";
 const STORAGE_POSTCARDS_BACKUP = "corea_labs_postcards_backup_v2";
@@ -8,6 +8,9 @@ const STORAGE_DELETED_DESTINATIONS = "corea_labs_deleted_destinations";
 const STORAGE_FESTIVALS = "corea_labs_custom_festivals";
 const STORAGE_FESTIVALS_BACKUP = "corea_labs_custom_festivals_backup_v2";
 const STORAGE_DELETED_FESTIVALS = "corea_labs_deleted_festivals";
+const STORAGE_QNA = "corea_labs_qna_posts";
+const STORAGE_QNA_BACKUP = "corea_labs_qna_posts_backup_v2";
+const STORAGE_DELETED_QNA = "corea_labs_deleted_qna_ids";
 
 const IDB_NAME = "corea_labs_persistent_db_v1";
 const IDB_STORE = "kv_store";
@@ -469,3 +472,255 @@ export async function deleteFestival(id: string, token?: string | null): Promise
 
   return true;
 }
+
+// --- Traveler Q&A Board (여행자 질문 & 답변 게시판) ---
+export const DEFAULT_QNA_POSTS: QnaPost[] = [
+  {
+    id: "qna_default_1",
+    category: "festival",
+    title: "진해군항제나 보령머드축제에 외국인도 렌터카 없이 KTX와 버스로 갈 수 있나요?",
+    content:
+      "한국에서 렌터카 운전이 부담스러운데 서울에서 출발해 진해군항제나 보령머드축제에 대중교통만으로 당일치기나 1박 2일 방문이 가능한지 궁금합니다!",
+    author: "Sakura_Traveler",
+    countryFlag: "🇯🇵",
+    createdAt: "2025-03-18T09:30:00.000Z",
+    likes: 42,
+    views: 318,
+    isPinned: true,
+    replies: [
+      {
+        id: "reply_default_1",
+        author: "Corea Labs 공식 컨시어지",
+        countryFlag: "🇰🇷",
+        content:
+          "네, 한국은 KTX 고속열차와 시외·고속버스, 축제 전용 무료 셔틀버스망이 매우 잘 갖추어져 있어 렌터카 없이도 편리하게 방문할 수 있습니다! 예를 들어 진해군항제는 서울역에서 KTX로 창원중앙역(약 3시간) 이동 후 시내버스나 축제 무료 셔틀버스로 바로 연결되며, 보령머드축제는 용산역에서 장항선 열차로 대천역에 하차 후 시내버스로 15분이면 해변 축제장에 도착합니다. 본 사이트의 [Festivals] 메뉴에서 각 축제 카드를 클릭하시면 KTX·고속버스·시내버스 상세 노선 번호를 확인하실 수 있습니다.",
+        createdAt: "2025-03-18T10:05:00.000Z",
+        isOfficial: true,
+      },
+    ],
+  },
+  {
+    id: "qna_default_2",
+    category: "finance",
+    title: "한국 여행 시 현금 환전과 WOWPASS / T-money 카드 중 무엇을 준비하는 게 좋나요?",
+    content:
+      "일주일 동안 서울, 경주, 부산을 여행할 예정입니다. 공항에서 현금을 많이 환전해야 할지, 아니면 외국인 전용 선불카드(WOWPASS, NAMANE)로 충분한지 조언 부탁드립니다.",
+    author: "Lucas_M",
+    countryFlag: "🇺🇸",
+    createdAt: "2025-03-16T14:20:00.000Z",
+    likes: 37,
+    views: 274,
+    isPinned: true,
+    replies: [
+      {
+        id: "reply_default_2",
+        author: "Corea Labs 공식 컨시어지",
+        countryFlag: "🇰🇷",
+        content:
+          "한국은 백화점, 식당, 카페, 택시 등 95% 이상의 매장에서 신용카드 및 선불카드 결제가 가능합니다. 따라서 [카드로 85% + 소액 현금 15%(약 5만~10만 원)] 비율을 가장 추천합니다. 인천공항이나 주요 지하철역 키오스크에서 WOWPASS 또는 NAMANE 카드를 발급받으시면 외화로 바로 충전해 일반 결제와 지하철·버스 교통카드(T-money) 기능을 한 장으로 모두 사용하실 수 있습니다. 전통시장 길거리 간식이나 노점 이용 시에만 소액 현금을 사용하세요!",
+        createdAt: "2025-03-16T15:00:00.000Z",
+        isOfficial: true,
+      },
+    ],
+  },
+  {
+    id: "qna_default_3",
+    category: "visa",
+    title: "K-ETA 신청 기한과 Q-Code 사전 등록은 입국 며칠 전에 해야 하나요?",
+    content:
+      "다음 주 인천국제공항을 통해 입국합니다. K-ETA 전자여행허가와 Q-Code 검역 QR코드는 출발 몇 시간 전까지 신청해야 안전할까요?",
+    author: "Somchai_BKK",
+    countryFlag: "🇹🇭",
+    createdAt: "2025-03-14T11:15:00.000Z",
+    likes: 29,
+    views: 215,
+    replies: [
+      {
+        id: "reply_default_3",
+        author: "Corea Labs 공식 컨시어지",
+        countryFlag: "🇰🇷",
+        content:
+          "K-ETA(전자여행허가)는 심사 시간을 고려해 항공기 탑승 최소 72시간 전까지 공식 웹사이트(k-eta.go.kr)에서 신청하시는 것을 권장합니다(유효기간 3년, 수수료 10,000원). Q-Code(검역정보 사전입력시스템)는 입국 3일 전부터 등록 가능하며, 미리 QR코드를 발급받아 스마트폰에 저장해 두시면 인천공항 도착 후 검역 게이트를 대기 없이 빠르게 통과하실 수 있습니다.",
+        createdAt: "2025-03-14T11:48:00.000Z",
+        isOfficial: true,
+      },
+    ],
+  },
+  {
+    id: "qna_default_4",
+    category: "places",
+    title: "경복궁과 창덕궁 방문 시 한복을 입으면 정말 입장료가 무료인가요?",
+    content:
+      "서울 고궁 투어를 계획 중인데 한복 대여점에서 한복을 입고 가면 사전 예약 없이도 무료 입장이 가능한지, 그리고 화요일 휴궁일이 맞는지 궁금합니다.",
+    author: "Marie_Paris",
+    countryFlag: "🇫🇷",
+    createdAt: "2025-03-11T16:40:00.000Z",
+    likes: 34,
+    views: 249,
+    replies: [
+      {
+        id: "reply_default_4",
+        author: "Corea Labs 공식 컨시어지",
+        countryFlag: "🇰🇷",
+        content:
+          "네, 맞습니다! 전통 한복 또는 생활 한복 규정에 맞는 한복을 착용하시면 경복궁, 창덕궁, 창경궁, 덕수궁, 종묘 모두 입장료가 무료입니다(단, 창덕궁 후원 특별관람은 별도 예약 및 요금 필요). 참고로 경복궁은 매주 화요일이 정기 휴궁일이며, 창덕궁·덕수궁·창경궁은 매주 월요일이 휴궁일이니 방문 요일을 꼭 확인하세요!",
+        createdAt: "2025-03-11T17:10:00.000Z",
+        isOfficial: true,
+      },
+    ],
+  },
+];
+
+export function getDeletedQnaIds(): string[] {
+  return safeReadLocalArray<string>(STORAGE_DELETED_QNA);
+}
+
+export async function getQnaPosts(): Promise<QnaPost[]> {
+  const deletedIds = getDeletedQnaIds();
+  const localItems = safeReadLocalArray<QnaPost>(STORAGE_QNA, STORAGE_QNA_BACKUP);
+  const idbItems = (await idbGet<QnaPost[]>(STORAGE_QNA)) || [];
+  const combinedLocal = mergeById(localItems, idbItems, deletedIds);
+
+  let serverPosts: QnaPost[] = [];
+  try {
+    const res = await fetch("/api/qna");
+    if (res.ok && isJsonResponse(res)) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        serverPosts = data;
+      }
+    }
+  } catch {
+    // fallback to local + defaults
+  }
+
+  const mergedWithServer = mergeById(combinedLocal, serverPosts, deletedIds);
+  const allPosts = mergeById(mergedWithServer, DEFAULT_QNA_POSTS, deletedIds);
+
+  // Sort: pinned first, then newest createdAt
+  allPosts.sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  safeWriteLocalArray(STORAGE_QNA, allPosts, STORAGE_QNA_BACKUP);
+  await idbSet(STORAGE_QNA, allPosts);
+  return allPosts;
+}
+
+export async function addQnaPost(
+  postInput: Omit<QnaPost, "id" | "createdAt" | "likes" | "views" | "replies">
+): Promise<QnaPost> {
+  const newPost: QnaPost = {
+    ...postInput,
+    id: `qna_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    createdAt: new Date().toISOString(),
+    likes: 1,
+    views: 1,
+    replies: [],
+  };
+
+  const current = await getQnaPosts();
+  const updated = [newPost, ...current];
+  safeWriteLocalArray(STORAGE_QNA, updated, STORAGE_QNA_BACKUP);
+  await idbSet(STORAGE_QNA, updated);
+
+  try {
+    await fetch("/api/qna", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newPost),
+    });
+  } catch {
+    // local persistence already completed
+  }
+
+  return newPost;
+}
+
+export async function addQnaReply(
+  postId: string,
+  replyInput: Omit<QnaReply, "id" | "createdAt">
+): Promise<QnaPost | null> {
+  const newReply: QnaReply = {
+    ...replyInput,
+    id: `reply_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    createdAt: new Date().toISOString(),
+  };
+
+  const current = await getQnaPosts();
+  let updatedTarget: QnaPost | null = null;
+  const updated = current.map((post) => {
+    if (post.id === postId) {
+      updatedTarget = {
+        ...post,
+        replies: [...(post.replies || []), newReply],
+      };
+      return updatedTarget;
+    }
+    return post;
+  });
+
+  if (updatedTarget) {
+    safeWriteLocalArray(STORAGE_QNA, updated, STORAGE_QNA_BACKUP);
+    await idbSet(STORAGE_QNA, updated);
+
+    try {
+      await fetch(`/api/qna/${postId}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newReply),
+      });
+    } catch {
+      // local persistence already completed
+    }
+  }
+
+  return updatedTarget;
+}
+
+export async function toggleQnaLike(postId: string): Promise<QnaPost | null> {
+  const current = await getQnaPosts();
+  let updatedTarget: QnaPost | null = null;
+  const updated = current.map((post) => {
+    if (post.id === postId) {
+      updatedTarget = { ...post, likes: (post.likes || 0) + 1 };
+      return updatedTarget;
+    }
+    return post;
+  });
+
+  if (updatedTarget) {
+    safeWriteLocalArray(STORAGE_QNA, updated, STORAGE_QNA_BACKUP);
+    await idbSet(STORAGE_QNA, updated);
+
+    try {
+      await fetch(`/api/qna/${postId}/like`, { method: "POST" });
+    } catch {}
+  }
+
+  return updatedTarget;
+}
+
+export async function deleteQnaPost(postId: string, token?: string | null): Promise<boolean> {
+  try {
+    await fetch(`/api/qna/${postId}`, {
+      method: "DELETE",
+      headers: { "x-admin-token": token || "" },
+    });
+  } catch {}
+
+  const deleted = getDeletedQnaIds();
+  if (!deleted.includes(postId)) {
+    safeWriteLocalArray(STORAGE_DELETED_QNA, [...deleted, postId]);
+  }
+
+  const localItems = safeReadLocalArray<QnaPost>(STORAGE_QNA, STORAGE_QNA_BACKUP);
+  const idbItems = (await idbGet<QnaPost[]>(STORAGE_QNA)) || [];
+  const remaining = mergeById(localItems, idbItems).filter((p) => p.id !== postId);
+  safeWriteLocalArray(STORAGE_QNA, remaining, STORAGE_QNA_BACKUP);
+  await idbSet(STORAGE_QNA, remaining);
+  return true;
+}
+

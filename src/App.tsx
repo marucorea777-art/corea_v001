@@ -7,6 +7,8 @@ import CultureView from "./components/CultureView";
 import PlacesView from "./components/PlacesView";
 import FestivalsView from "./components/FestivalsView";
 import TravelView from "./components/TravelView";
+import QnaBoardView from "./components/QnaBoardView";
+import TravelConciergeWidget from "./components/TravelConciergeWidget";
 import LegalAndAboutViews from "./components/LegalAndAboutViews";
 import { LanguageProvider, Translate, useTranslation } from "./context/LanguageContext";
 import { AdminProvider, useAdmin } from "./context/AdminContext";
@@ -26,12 +28,12 @@ function getInitialTabFromUrl(): string {
   if (typeof window === "undefined") return "home";
   try {
     const pathname = window.location.pathname.replace(/^\/+|\/+$/g, "").toLowerCase();
-    if (["privacy", "terms", "about", "heritage", "culture", "places", "festivals", "travel"].includes(pathname)) {
+    if (["privacy", "terms", "about", "heritage", "culture", "places", "festivals", "travel", "qna"].includes(pathname)) {
       return pathname;
     }
     const params = new URLSearchParams(window.location.search);
     const pageParam = (params.get("page") || params.get("tab") || "").toLowerCase();
-    if (["privacy", "terms", "about", "heritage", "culture", "places", "festivals", "travel"].includes(pageParam)) {
+    if (["privacy", "terms", "about", "heritage", "culture", "places", "festivals", "travel", "qna"].includes(pageParam)) {
       return pageParam;
     }
   } catch {}
@@ -92,6 +94,8 @@ function MainApp() {
         return <FestivalsView />;
       case "travel":
         return <TravelView />;
+      case "qna":
+        return <QnaBoardView />;
       case "privacy":
         return <LegalAndAboutViews activePage="privacy" setActiveTab={handleSetTab} />;
       case "terms":
@@ -246,6 +250,9 @@ function MainApp() {
 
       {/* Global Admin Login Modal */}
       <AdminLoginModal />
+
+      {/* Floating 24/7 Multi-Language Travel Concierge Chatbot & Q&A Launcher */}
+      <TravelConciergeWidget onNavigateTab={handleSetTab} />
     </div>
   );
 }
