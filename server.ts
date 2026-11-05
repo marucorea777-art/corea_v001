@@ -138,18 +138,34 @@ ${JSON.stringify(texts, null, 2)}`;
     "corealabs1234"
   ];
 
-  function getValidAdminPasswords() {
+  function getValidAdminPasswords(clientSavedCustomPassword?: string) {
     const db = getDb();
-    const list = [...DEFAULT_ADMIN_PASSWORDS];
-    if (db.adminPassword) {
-      list.unshift(db.adminPassword);
+    // If server was freshly deployed/published and client provides its persisted custom password, restore it automatically
+    if (!db.adminPassword && clientSavedCustomPassword && typeof clientSavedCustomPassword === "string" && clientSavedCustomPassword.trim().length >= 4) {
+      db.adminPassword = clientSavedCustomPassword.trim();
+      saveDb(db);
     }
-    return Array.from(new Set(list));
+    if (db.adminPassword && typeof db.adminPassword === "string" && db.adminPassword.trim().length >= 4) {
+      return [db.adminPassword.trim()];
+    }
+    return Array.from(new Set(DEFAULT_ADMIN_PASSWORDS));
   }
 
+  app.post("/api/admin/sync-password", (req, res) => {
+    const { customPassword } = req.body || {};
+    if (customPassword && typeof customPassword === "string" && customPassword.trim().length >= 4) {
+      const db = getDb();
+      db.adminPassword = customPassword.trim();
+      saveDb(db);
+      return res.json({ success: true, hasCustomPassword: true });
+    }
+    const db = getDb();
+    return res.json({ success: true, hasCustomPassword: Boolean(db.adminPassword) });
+  });
+
   app.post("/api/admin/login", (req, res) => {
-    const { password } = req.body || {};
-    const validPasswords = getValidAdminPasswords();
+    const { password, clientSavedCustomPassword } = req.body || {};
+    const validPasswords = getValidAdminPasswords(clientSavedCustomPassword);
     if (password && validPasswords.includes(password.trim())) {
       const token = "admin_session_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8);
       return res.json({ success: true, token });
@@ -158,12 +174,12 @@ ${JSON.stringify(texts, null, 2)}`;
   });
 
   app.post("/api/admin/change-password", (req, res) => {
-    const { currentPassword, newPassword } = req.body || {};
+    const { currentPassword, newPassword, clientSavedCustomPassword } = req.body || {};
     if (!newPassword || newPassword.trim().length < 4) {
       return res.status(400).json({ success: false, message: "새 비밀번호는 최소 4자리 이상이어야 합니다." });
     }
 
-    const validPasswords = getValidAdminPasswords();
+    const validPasswords = getValidAdminPasswords(clientSavedCustomPassword);
     if (!currentPassword || !validPasswords.includes(currentPassword.trim())) {
       return res.status(401).json({ success: false, message: "현재 비밀번호가 올바르지 않습니다." });
     }
@@ -181,7 +197,7 @@ ${JSON.stringify(texts, null, 2)}`;
 
   app.get("/api/admin/verify", (req, res) => {
     const token = req.headers["x-admin-token"];
-    if (token && typeof token === "string" && token.startsWith("admin_")) {
+    if (token && typeof token === "string" && (token.startsWith("admin_") || token.startsWith("local_admin_"))) {
       return res.json({ isAdmin: true });
     }
     return res.json({ isAdmin: false });
@@ -800,6 +816,13 @@ ${JSON.stringify(texts, null, 2)}`;
     db.analytics = getZeroAnalytics();
     saveDb(db);
     return res.json({ success: true, message: "순수 실제 접속자 데이터(0부터 측정)로 초기화되었습니다.", mode: "zero" });
+  });
+
+  // Explicit Google AdSense ads.txt endpoint
+  app.get("/ads.txt", (_req, res) => {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send("google.com, pub-6232324178916733, DIRECT, f08c47fec0942fa0\n");
   });
 
   // Vite middleware for development

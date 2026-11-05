@@ -28,6 +28,10 @@ Allow: /
 User-agent: AdsBot-Google
 Allow: /
 
+User-agent: Google-adstxt
+Allow: /
+Allow: /ads.txt
+
 # Canonical Sitemap & AI Search Manifest for Corea Labs
 Sitemap: https://corea-labs.com/sitemap.xml
 # LLMs Manifest: https://corea-labs.com/llms.txt

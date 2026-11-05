@@ -5,7 +5,7 @@ import { useAdmin } from "../context/AdminContext";
 import { Translate } from "../context/LanguageContext";
 
 export default function AdminLoginModal() {
-  const { showLoginModal, setShowLoginModal, login, changePassword, isAdmin, logout, setShowAnalyticsModal } = useAdmin();
+  const { showLoginModal, setShowLoginModal, login, changePassword, isAdmin, hasCustomPassword, logout, setShowAnalyticsModal } = useAdmin();
   
   const [activeTab, setActiveTab] = useState<"login" | "changePassword">("login");
   const [password, setPassword] = useState("");
@@ -71,7 +71,7 @@ export default function AdminLoginModal() {
     setIsLoading(false);
 
     if (res.success) {
-      setSuccessMsg("관리자 비밀번호가 성공적으로 변경되었습니다!");
+      setSuccessMsg(res.message || "관리자 비밀번호가 성공적으로 변경되었습니다!");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -239,7 +239,7 @@ export default function AdminLoginModal() {
                           setPassword(e.target.value);
                           setError(null);
                         }}
-                        placeholder="비밀번호 입력 (기본: admin1234)"
+                        placeholder={hasCustomPassword ? "설정한 관리자 비밀번호 입력" : "비밀번호 입력 (초기: admin1234)"}
                         autoFocus
                         className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 transition-all font-mono"
                       />
@@ -247,7 +247,13 @@ export default function AdminLoginModal() {
                     <div className="flex items-center justify-between mt-1 text-[11px] text-stone-400">
                       <span className="flex items-center gap-1">
                         <Lock className="w-3 h-3 text-stone-400" />
-                        <span><Translate>기본 비밀번호</Translate>: <strong className="text-stone-600 font-mono">admin1234</strong></span>
+                        {hasCustomPassword ? (
+                          <span className="text-emerald-700 font-semibold">
+                            <Translate>사용자 지정 비밀번호 적용 중 (퍼블리시 후에도 유지됨)</Translate>
+                          </span>
+                        ) : (
+                          <span><Translate>초기 비밀번호</Translate>: <strong className="text-stone-600 font-mono">admin1234</strong></span>
+                        )}
                       </span>
                       <button
                         type="button"
