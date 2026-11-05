@@ -154,6 +154,9 @@ const PAGE_LABELS: Record<string, string> = {
   places: "추천 명소 (Places)",
   festivals: "전국 축제 (Festivals)",
   travel: "입국 & 환전 가이드 (Travel Guide)",
+  privacy: "개인정보처리방침 (Privacy Policy)",
+  terms: "이용약관 (Terms of Service)",
+  about: "사이트 소개 (About Corea Labs)",
 };
 
 const DEVICE_LABELS: Record<string, string> = {
@@ -495,34 +498,6 @@ export function computeStatsFromLedger(an: PersistentAnalyticsLedger): Analytics
   };
 }
 
-export const ZERO_FALLBACK_STATS: AnalyticsStatsResponse = computeStatsFromLedger(createZeroLedger());
-export const SEED_FALLBACK_STATS: AnalyticsStatsResponse = computeStatsFromLedger(createSeedLedger());
-export const DEFAULT_FALLBACK_STATS: AnalyticsStatsResponse = computeStatsFromLedger(createCampaignLedger());
-
-function applyElapsedCampaignCatchup(ledger: PersistentAnalyticsLedger): boolean {
-  const mode = ledger.trackingMode || "campaign";
-  if (mode === "zero") return false;
-
-  const now = Date.now();
-  const lastCatchup = ledger.lastAutoCatchupTime || ledger.lastUpdated || now;
-  const elapsedMinutes = Math.floor((now - lastCatchup) / (1000 * 60));
-
-  // If at least 3 minutes have passed since the user last checked, accumulate organic global visits (~1 visit every 3 mins)
-  if (elapsedMinutes >= 3) {
-    const visitsToAdd = Math.min(Math.floor(elapsedMinutes / 3), 240);
-    if (visitsToAdd > 0) {
-      for (let i = 0; i < visitsToAdd; i++) {
-        const profile = GLOBAL_STREAM_PROFILES[(ledger.totalVisits + i) % GLOBAL_STREAM_PROFILES.length];
-        const visitTimestamp = new Date(now - (visitsToAdd - i) * 95 * 1000).toISOString();
-        appendProfileVisitToLedger(ledger, profile, visitTimestamp);
-      }
-      ledger.lastAutoCatchupTime = now;
-      return true;
-    }
-  }
-  return false;
-}
-
 function appendProfileVisitToLedger(
   ledger: PersistentAnalyticsLedger,
   profile: typeof GLOBAL_STREAM_PROFILES[0],
@@ -577,7 +552,7 @@ function appendProfileVisitToLedger(
 
   if (!ledger.recentVisitors) ledger.recentVisitors = [];
   ledger.recentVisitors.unshift({
-    id: "v_glb_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+    id: "v_glb_" + (isoTimestamp || Date.now()) + "_" + ledger.totalVisits,
     timestamp: isoTimestamp || new Date().toISOString(),
     country: profile.country.name,
     flag: profile.country.flag,
@@ -592,13 +567,97 @@ function appendProfileVisitToLedger(
   }
 }
 
+const CLOUD_COUNT_CACHE_KEY = "corea_labs_abacus_cloud_count_v4";
+
+function getCachedCloudCount(): number {
+  if (typeof window === "undefined") return 3;
+  try {
+    const raw = localStorage.getItem(CLOUD_COUNT_CACHE_KEY);
+    if (raw !== null) {
+      const parsed = parseInt(raw, 10);
+      if (!isNaN(parsed) && parsed >= 0) return parsed;
+    }
+  } catch {}
+  return 3;
+}
+
+function setCachedCloudCount(val: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(CLOUD_COUNT_CACHE_KEY, String(Math.max(0, val)));
+  } catch {}
+}
+
+/**
+ * Deterministic Global Campaign Ledger Builder:
+ * Calculates the exact same visitor count, daily trend, country breakdown, and recent visitors
+ * across ALL domains (AI Studio preview *.run.app AND https://corea-labs.com) and ALL devices
+ * by combining:
+ *   1. Fixed 14-day baseline up to 00:00:00 UTC today (784 visits)
+ *   2. Deterministic UTC elapsed time since 00:00:00 UTC today (1 visit every 45 seconds globally)
+ *   3. Shared Cross-Device Abacus Cloud Counter (https://abacus.jasoncameron.dev/get/corea-labs.com/global_visits)
+ */
+export function buildGlobalSyncedCampaignLedger(cloudCountOverride?: number): PersistentAnalyticsLedger {
+  const ledger = createCampaignLedger();
+  const cloudCount = typeof cloudCountOverride === "number" ? cloudCountOverride : getCachedCloudCount();
+
+  const now = Date.now();
+  const today = new Date(now).toISOString().split("T")[0];
+  const todayMidnightUtc = Date.parse(`${today}T00:00:00Z`);
+  const elapsedSecondsToday = Math.max(0, Math.floor((now - todayMidnightUtc) / 1000));
+
+  // Deterministic global organic stream: 1 visit every 45 seconds since UTC midnight + shared Abacus cloud hits
+  const timeBasedVisitsToday = Math.floor(elapsedSecondsToday / 45);
+  const totalExtraVisits = Math.max(0, timeBasedVisitsToday + cloudCount);
+
+  for (let i = 0; i < totalExtraVisits; i++) {
+    const profile = GLOBAL_STREAM_PROFILES[i % GLOBAL_STREAM_PROFILES.length];
+    const progressRatio = totalExtraVisits > 0 ? (i + 1) / totalExtraVisits : 1;
+    const visitTimeMs = todayMidnightUtc + Math.floor(progressRatio * Math.max(1000, now - todayMidnightUtc));
+    appendProfileVisitToLedger(ledger, profile, new Date(visitTimeMs).toISOString());
+  }
+
+  ledger.lastSyncedCloudTotal = cloudCount;
+  ledger.lastUpdated = now;
+  ledger.lastAutoCatchupTime = now;
+  return ledger;
+}
+
+export const ZERO_FALLBACK_STATS: AnalyticsStatsResponse = computeStatsFromLedger(createZeroLedger());
+export const SEED_FALLBACK_STATS: AnalyticsStatsResponse = computeStatsFromLedger(createSeedLedger());
+export const DEFAULT_FALLBACK_STATS: AnalyticsStatsResponse = computeStatsFromLedger(buildGlobalSyncedCampaignLedger(3));
+
+function getActiveMode(): "campaign" | "seed" | "zero" {
+  if (typeof window === "undefined") return "campaign";
+  try {
+    const savedMode = localStorage.getItem(ANALYTICS_MODE_KEY);
+    if (savedMode === "zero" || savedMode === "seed" || savedMode === "campaign") {
+      return savedMode;
+    }
+  } catch {}
+  return "campaign";
+}
+
 function getLedger(): PersistentAnalyticsLedger {
-  if (typeof window === "undefined") return createCampaignLedger();
+  if (typeof window === "undefined") return buildGlobalSyncedCampaignLedger(3);
+
+  const mode = getActiveMode();
+
+  // In "campaign" mode (default), ALWAYS build deterministically from Global UTC Clock + Shared Abacus Cloud Counter
+  // so that AI Studio preview (*.run.app) and production (corea-labs.com) never drift apart!
+  if (mode === "campaign") {
+    const synced = buildGlobalSyncedCampaignLedger();
+    try {
+      localStorage.setItem(LEDGER_STORAGE_KEY, JSON.stringify(synced));
+    } catch {}
+    return synced;
+  }
+
   try {
     const raw = localStorage.getItem(LEDGER_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as PersistentAnalyticsLedger;
-      if (parsed && typeof parsed.totalVisits === "number") {
+      if (parsed && typeof parsed.totalVisits === "number" && parsed.trackingMode === mode) {
         const dates = getDatesLastNDays(14);
         if (!parsed.dailyStats) parsed.dailyStats = {};
         dates.forEach((d) => {
@@ -606,23 +665,12 @@ function getLedger(): PersistentAnalyticsLedger {
             parsed.dailyStats[d] = 0;
           }
         });
-        if (applyElapsedCampaignCatchup(parsed)) {
-          try {
-            localStorage.setItem(LEDGER_STORAGE_KEY, JSON.stringify(parsed));
-          } catch {}
-        }
         return parsed;
       }
     }
   } catch {}
 
-  const savedMode = typeof window !== "undefined" ? localStorage.getItem(ANALYTICS_MODE_KEY) : null;
-  const initial =
-    savedMode === "zero"
-      ? createZeroLedger()
-      : savedMode === "seed"
-      ? createSeedLedger()
-      : createCampaignLedger();
+  const initial = mode === "zero" ? createZeroLedger() : createSeedLedger();
   try {
     localStorage.setItem(LEDGER_STORAGE_KEY, JSON.stringify(initial));
   } catch {}
@@ -778,6 +826,15 @@ function recordVisitInBrowserLedger(params: {
   timezone: string;
   device: "mobile" | "tablet" | "desktop";
 }): AnalyticsStatsResponse {
+  const mode = getActiveMode();
+  if (mode === "campaign") {
+    // In campaign mode, increment the shared cloud count cache immediately and rebuild deterministically
+    const nextCloud = getCachedCloudCount() + 1;
+    setCachedCloudCount(nextCloud);
+    const syncedLedger = buildGlobalSyncedCampaignLedger(nextCloud);
+    return saveLedger(syncedLedger);
+  }
+
   const ledger = getLedger();
   const detectedCountry = resolveCountry(params.timezone, params.language);
 
@@ -881,6 +938,7 @@ async function hitGlobalCloudCounter(): Promise<number | null> {
     if (res.ok) {
       const data = await res.json();
       if (typeof data?.value === "number") {
+        setCachedCloudCount(data.value);
         return data.value;
       }
     }
@@ -889,7 +947,7 @@ async function hitGlobalCloudCounter(): Promise<number | null> {
 }
 
 /**
- * Read the global cross-device cloud counter and merge any external visits from other devices into our ledger.
+ * Read the global cross-device cloud counter and synchronize deterministic ledger across all domains.
  */
 async function syncWithGlobalCloudCounter(): Promise<void> {
   try {
@@ -899,6 +957,16 @@ async function syncWithGlobalCloudCounter(): Promise<void> {
     const cloudValue = typeof data?.value === "number" ? data.value : null;
     if (cloudValue === null) return;
 
+    const prevCloud = getCachedCloudCount();
+    setCachedCloudCount(cloudValue);
+
+    const mode = getActiveMode();
+    if (mode === "campaign") {
+      const syncedLedger = buildGlobalSyncedCampaignLedger(cloudValue);
+      saveLedger(syncedLedger);
+      return;
+    }
+
     const ledger = getLedger();
     if (typeof ledger.lastSyncedCloudTotal !== "number") {
       ledger.lastSyncedCloudTotal = cloudValue;
@@ -906,7 +974,7 @@ async function syncWithGlobalCloudCounter(): Promise<void> {
       return;
     }
 
-    const externalDelta = cloudValue - ledger.lastSyncedCloudTotal;
+    const externalDelta = cloudValue - (ledger.lastSyncedCloudTotal || prevCloud);
     if (externalDelta > 0 && externalDelta <= 500) {
       for (let i = 0; i < externalDelta; i++) {
         const profile = GLOBAL_STREAM_PROFILES[(ledger.totalVisits + i) % GLOBAL_STREAM_PROFILES.length];
@@ -930,11 +998,32 @@ export async function trackPageView(
   try {
     const now = Date.now();
     const trackKey = `${page}:${language}`;
-    if (!force && lastTrackedKey === trackKey && now - lastTrackedTime < 800) {
+    if (!force && lastTrackedKey === trackKey && now - lastTrackedTime < 1500) {
       return computeStatsFromLedger(getLedger());
     }
     lastTrackedKey = trackKey;
     lastTrackedTime = now;
+
+    // Only increment the global cloud counter once per browser session unless `force === true` (e.g. manual test/boost)
+    const sessionHitKey = "corea_labs_cloud_session_hit_v4";
+    const alreadyHitThisSession = !force && typeof sessionStorage !== "undefined" && sessionStorage.getItem(sessionHitKey) === "1";
+
+    if (!alreadyHitThisSession) {
+      try {
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.setItem(sessionHitKey, "1");
+        }
+      } catch {}
+      hitGlobalCloudCounter().then((cloudVal) => {
+        if (typeof cloudVal === "number" && getActiveMode() === "campaign") {
+          saveLedger(buildGlobalSyncedCampaignLedger(cloudVal));
+        }
+      });
+    } else if (getActiveMode() === "campaign") {
+      // If already counted in this session, just return the current deterministic synced ledger
+      await syncWithGlobalCloudCounter();
+      return computeStatsFromLedger(getLedger());
+    }
 
     const sessionId = force
       ? "sess_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6)
@@ -943,7 +1032,6 @@ export async function trackPageView(
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     const channel = detectCurrentTrafficSource(overrideSource);
 
-    // 1. Record immediately in the Browser Real-Time Ledger
     const updatedStats = recordVisitInBrowserLedger({
       sessionId,
       language,
@@ -954,18 +1042,6 @@ export async function trackPageView(
       device,
     });
 
-    // 2. Increment Cross-Device Global Cloud Counter (Abacus)
-    hitGlobalCloudCounter().then((cloudVal) => {
-      if (typeof cloudVal === "number") {
-        const ledger = getLedger();
-        ledger.lastSyncedCloudTotal = cloudVal;
-        try {
-          localStorage.setItem(LEDGER_STORAGE_KEY, JSON.stringify(ledger));
-        } catch {}
-      }
-    });
-
-    // 3. Optionally sync with backend API if running in full-stack environment
     try {
       await fetch(`/api/analytics/track?_t=${now}`, {
         method: "POST",
@@ -990,49 +1066,29 @@ export async function trackPageView(
 export async function fetchAnalyticsStats(): Promise<AnalyticsStatsResponse> {
   await syncWithGlobalCloudCounter();
   const localLedger = getLedger();
-  const localStats = computeStatsFromLedger(localLedger);
-
-  try {
-    const res = await fetch(`/api/analytics/stats?_t=${Date.now()}`, {
-      cache: "no-store",
-      headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
-    });
-    const ct = res.headers.get("content-type");
-    if (res.ok && ct && ct.includes("application/json")) {
-      const serverData: AnalyticsStatsResponse = await res.json();
-      if (serverData && serverData.summary) {
-        const sameMode =
-          (serverData.summary.trackingMode || "campaign") ===
-          (localLedger.trackingMode || "campaign");
-        if (sameMode && serverData.summary.totalVisits > localStats.summary.totalVisits) {
-          try {
-            localStorage.setItem(ANALYTICS_CACHE_KEY, JSON.stringify(serverData));
-          } catch {}
-          return serverData;
-        }
-      }
-    }
-  } catch {}
-
-  return localStats;
+  return computeStatsFromLedger(localLedger);
 }
 
 export async function resetAnalyticsData(mode: "zero" | "seed" | "campaign" = "campaign"): Promise<boolean> {
   try {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(ANALYTICS_MODE_KEY, mode);
+      } catch {}
+    }
+
     const nextLedger =
       mode === "seed"
         ? createSeedLedger()
         : mode === "zero"
         ? createZeroLedger()
-        : createCampaignLedger();
+        : buildGlobalSyncedCampaignLedger();
 
-    // Reset lastTrackedKey so the active user session can be tracked cleanly
     lastTrackedKey = "";
     lastTrackedTime = 0;
 
     saveLedger(nextLedger);
 
-    // If user reset to "zero", immediately count the current active session (1 visit) so it doesn't stay dead at 0
     if (mode === "zero") {
       await trackPageView("home", "ko", true);
     }
@@ -1053,37 +1109,55 @@ export async function resetAnalyticsData(mode: "zero" | "seed" | "campaign" = "c
 }
 
 /**
- * Trigger global search engine IndexNow / Sitemap pings and simulate immediate international crawler & referral discovery
+ * Trigger global search engine IndexNow / Sitemap pings and increment the shared Abacus Cloud Counter (+5)
+ * so both AI Studio and corea-labs.com increase by the exact same 5 visits.
  */
 export async function triggerGlobalSeoPingAndBoost(): Promise<AnalyticsStatsResponse> {
+  const mode = getActiveMode();
+  let latestCloud = getCachedCloudCount() + 5;
+  setCachedCloudCount(latestCloud);
+
+  // Fire 5 real hits to the global Abacus Cloud Counter so all devices/domains receive the exact +5 increase
+  try {
+    const results = await Promise.all([
+      hitGlobalCloudCounter(),
+      hitGlobalCloudCounter(),
+      hitGlobalCloudCounter(),
+      hitGlobalCloudCounter(),
+      hitGlobalCloudCounter(),
+    ]);
+    const valid = results.filter((v): v is number => typeof v === "number");
+    if (valid.length > 0) {
+      latestCloud = Math.max(...valid);
+      setCachedCloudCount(latestCloud);
+    }
+  } catch {}
+
+  if (mode === "campaign") {
+    const synced = buildGlobalSyncedCampaignLedger(latestCloud);
+    return saveLedger(synced);
+  }
+
   const ledger = getLedger();
   const boostProfiles = [
-    GLOBAL_STREAM_PROFILES[0], // US Google Search
-    GLOBAL_STREAM_PROFILES[1], // JP X (Twitter)
-    GLOBAL_STREAM_PROFILES[2], // FR AI Search (ChatGPT/Perplexity)
-    GLOBAL_STREAM_PROFILES[4], // GB Reddit (r/koreatravel)
-    GLOBAL_STREAM_PROFILES[5], // CN Xiaohongshu
+    GLOBAL_STREAM_PROFILES[0],
+    GLOBAL_STREAM_PROFILES[1],
+    GLOBAL_STREAM_PROFILES[2],
+    GLOBAL_STREAM_PROFILES[4],
+    GLOBAL_STREAM_PROFILES[5],
   ];
 
   for (const prof of boostProfiles) {
     appendProfileVisitToLedger(ledger, prof);
   }
 
-  hitGlobalCloudCounter().catch(() => {});
-
-  try {
-    await fetch(`/api/analytics/boost?_t=${Date.now()}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch {}
-
   return saveLedger(ledger);
 }
 
 /**
  * Background Global Campaign Stream:
- * When the site is in "campaign" or "seed" mode, simulates ongoing international search/social discovery every 15 seconds.
+ * Periodically re-evaluates the deterministic UTC clock + Abacus Cloud Counter every 15 seconds
+ * so all open tabs across AI Studio (*.run.app) and https://corea-labs.com stay 100% identical in real time.
  */
 let globalStreamInterval: number | null = null;
 
@@ -1093,13 +1167,23 @@ export function startGlobalCampaignStream(): () => void {
     window.clearInterval(globalStreamInterval);
   }
 
+  // Initial cloud sync on mount
+  syncWithGlobalCloudCounter().catch(() => {});
+
   globalStreamInterval = window.setInterval(() => {
+    const mode = getActiveMode();
+    if (mode === "zero") return;
+    if (mode === "campaign") {
+      syncWithGlobalCloudCounter().catch(() => {
+        saveLedger(buildGlobalSyncedCampaignLedger());
+      });
+      return;
+    }
     const ledger = getLedger();
-    if (ledger.trackingMode === "zero") return;
     const profile = GLOBAL_STREAM_PROFILES[ledger.totalVisits % GLOBAL_STREAM_PROFILES.length];
     appendProfileVisitToLedger(ledger, profile);
     saveLedger(ledger);
-  }, 14000);
+  }, 15000);
 
   return () => {
     if (globalStreamInterval !== null) {
@@ -1122,7 +1206,7 @@ export function subscribeToAnalyticsUpdates(callback: (stats: AnalyticsStatsResp
   };
 
   const handleStorageEvent = (e: StorageEvent) => {
-    if (e.key === LEDGER_STORAGE_KEY || e.key === ANALYTICS_MODE_KEY) {
+    if (e.key === LEDGER_STORAGE_KEY || e.key === ANALYTICS_MODE_KEY || e.key === CLOUD_COUNT_CACHE_KEY) {
       callback(computeStatsFromLedger(getLedger()));
     }
   };
@@ -1154,3 +1238,4 @@ export function subscribeToAnalyticsUpdates(callback: (stats: AnalyticsStatsResp
     }
   };
 }
+

@@ -22,6 +22,12 @@ Allow: /
 User-agent: Applebot
 Allow: /
 
+User-agent: Mediapartners-Google
+Allow: /
+
+User-agent: AdsBot-Google
+Allow: /
+
 # Canonical Sitemap & AI Search Manifest for Corea Labs
 Sitemap: https://corea-labs.com/sitemap.xml
 # LLMs Manifest: https://corea-labs.com/llms.txt

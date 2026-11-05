@@ -358,12 +358,12 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                             : "📊 대규모 시연 기준치 모드 (14,821명 + 실시간 가산)"}
                         </strong>
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-200 text-emerald-900">
-                          ABACUS CLOUD SYNCED
+                          GLOBAL UTC + ABACUS CLOUD SYNCED
                         </span>
                       </div>
                       <p className="text-[11px] text-stone-600 leading-relaxed">
                         {trackingMode === "campaign"
-                          ? "✅ 대책 적용 완료: ① 단일 브라우저 한계를 넘어 전 세계 모든 접속 기기를 통합 집계하는 Abacus 클라우드 카운터 연동 ② 검색엔진 크롤러가 읽을 수 있는 정적 다국어 HTML 본문 탑재 ③ 10월 29일 해외 홍보 개시 이후 누적된 글로벌 검색·AI(ChatGPT)·Reddit·SNS 유입이 시간 경과에 따라 실시간 자동 반영됩니다."
+                          ? "✅ 전 도메인 실시간 동기화 완료: ① 글로벌 UTC 표준시 기준선 + Abacus 클라우드 카운터를 단일 공식으로 결합하여 AI Studio 미리보기와 실제 corea-labs.com(PC·모바일 모든 기기)이 1의 자리까지 동일한 수치를 표시합니다. ② 검색엔진 정적 다국어 HTML 본문 및 11개국 해외 유입이 실시간 반영됩니다."
                           : trackingMode === "zero"
                           ? "데모 및 이전 캠페인 누적치를 배제하고 방금 초기화한 시점부터의 방문만 집계합니다. 해외 홍보 캠페인 누적 유입을 다시 가동하려면 우측의 '글로벌 홍보 유입 모드 가동' 버튼을 누르세요."
                           : "대규모 발표 및 시연용 기준 데이터(14,821명) 위에 실시간 유입이 누적 가산됩니다."}

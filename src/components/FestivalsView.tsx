@@ -14,7 +14,8 @@ import {
   Check, 
   Sparkles, 
   Edit3,
-  Image as ImageIcon 
+  Image as ImageIcon,
+  Train
 } from "lucide-react";
 import { FESTIVALS } from "../data";
 import { Festival } from "../types";
@@ -29,6 +30,7 @@ import {
   deleteFestival 
 } from "../services/dataStorage";
 import ImageUploader, { ImagePreset } from "./ImageUploader";
+import FestivalDetailView from "./FestivalDetailView";
 
 // High-resolution real photorealistic festival presets (adhering strictly to AGENTS.md real photography rule)
 const REAL_FESTIVAL_PRESETS: ImagePreset[] = [
@@ -73,6 +75,7 @@ export default function FestivalsView() {
   const [selectedRegion, setSelectedRegion] = useState<string>("All");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [wishlist, setWishlist] = useState<string[]>([]);
+  const [selectedFestivalId, setSelectedFestivalId] = useState<string | null>(null);
   
   // Custom festivals & deleted IDs
   const [customFestivals, setCustomFestivals] = useState<Festival[]>([]);
@@ -286,9 +289,38 @@ export default function FestivalsView() {
   };
 
   const wishlistFestivals = allFestivals.filter((f) => wishlist.includes(f.id));
+  const selectedFestival = useMemo(
+    () => (selectedFestivalId ? allFestivals.find((f) => f.id === selectedFestivalId) || null : null),
+    [selectedFestivalId, allFestivals]
+  );
+
+  const handleOpenDetail = (fest: Festival) => {
+    setSelectedFestivalId(fest.id);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   return (
     <div className="space-y-12 pb-16">
+      {selectedFestival ? (
+        <FestivalDetailView
+          festival={selectedFestival}
+          allFestivals={allFestivals}
+          isWishlisted={wishlist.includes(selectedFestival.id)}
+          onToggleWishlist={handleToggleWishlist}
+          onBack={() => {
+            setSelectedFestivalId(null);
+            if (typeof window !== "undefined") {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
+          onSelectFestival={handleOpenDetail}
+          isAdmin={isAdmin}
+          onEditFestival={handleStartEditFestival}
+        />
+      ) : (
+        <>
       {/* Page Header */}
       <section className="text-center max-w-2xl mx-auto space-y-3">
         <div className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-950 border border-amber-200/50 px-3 py-1 rounded-full text-xs font-mono uppercase tracking-wider">
@@ -480,7 +512,8 @@ export default function FestivalsView() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
-                  className="bg-white rounded-3xl border border-stone-200/60 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
+                  onClick={() => handleOpenDetail(fest)}
+                  className="bg-white rounded-3xl border border-stone-200/60 overflow-hidden shadow-xs hover:shadow-lg hover:border-amber-400/80 transition-all flex flex-col justify-between group cursor-pointer"
                 >
                   <div>
                     {/* Visual Card Header with Real Photorealistic Image */}
@@ -521,14 +554,20 @@ export default function FestivalsView() {
                         {isAdmin && (
                           <>
                             <button
-                              onClick={() => handleStartEditFestival(fest)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStartEditFestival(fest);
+                              }}
                               className="p-2 rounded-full bg-amber-500/95 text-stone-950 hover:bg-amber-400 transition-all cursor-pointer shadow-md"
                               title="축제 정보 수정 (관리자)"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => handleDeleteFestival(fest.id, fest.name)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteFestival(fest.id, fest.name);
+                              }}
                               className="p-2 rounded-full bg-red-600/90 text-white hover:bg-red-700 transition-all cursor-pointer shadow-md"
                               title="축제 삭제 (관리자)"
                             >
@@ -539,7 +578,10 @@ export default function FestivalsView() {
 
                         {/* Favorite trigger button */}
                         <button
-                          onClick={() => handleToggleWishlist(fest.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleWishlist(fest.id);
+                          }}
                           className={`p-2 rounded-full backdrop-blur-md transition-all cursor-pointer ${
                             inWishlist
                               ? "bg-rose-500 text-white hover:bg-rose-600"
@@ -576,7 +618,7 @@ export default function FestivalsView() {
                     </div>
 
                     <div className="p-5 space-y-4">
-                      <p className="text-xs text-stone-600 leading-relaxed font-sans">
+                      <p className="text-xs text-stone-600 leading-relaxed font-sans line-clamp-3">
                         <Translate>{fest.description}</Translate>
                       </p>
 
@@ -598,32 +640,43 @@ export default function FestivalsView() {
                     </div>
                   </div>
 
-                  <div className="px-5 pb-5 pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
-                    <span className="text-stone-500 flex items-center gap-1 font-sans">
-                      <MapPin className="w-3.5 h-3.5 text-stone-400" />
-                      <Translate>{fest.location}</Translate>
-                    </span>
+                  <div className="px-5 pb-5 pt-3 border-t border-stone-100 space-y-2.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-stone-500 flex items-center gap-1 font-sans truncate">
+                        <MapPin className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                        <Translate>{fest.location}</Translate>
+                      </span>
 
-                    {isAdmin && (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleStartEditFestival(fest)}
-                          className="text-stone-600 hover:text-amber-600 px-2.5 py-1 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-semibold"
-                          title="축제 수정"
-                        >
-                          <Edit3 className="w-3.5 h-3.5 text-amber-600" />
-                          <span><Translate>수정</Translate></span>
-                        </button>
-                        <button
-                          onClick={() => handleDeleteFestival(fest.id, fest.name)}
-                          className="text-stone-400 hover:text-red-600 px-2.5 py-1 hover:bg-red-50 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-[11px]"
-                          title="축제 삭제"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span><Translate>삭제</Translate></span>
-                        </button>
-                      </div>
-                    )}
+                      {isAdmin && (
+                        <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleStartEditFestival(fest)}
+                            className="text-stone-600 hover:text-amber-600 px-2.5 py-1 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-semibold"
+                            title="축제 수정"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                            <span><Translate>수정</Translate></span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteFestival(fest.id, fest.name)}
+                            className="text-stone-400 hover:text-red-600 px-2.5 py-1 hover:bg-red-50 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-[11px]"
+                            title="축제 삭제"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span><Translate>삭제</Translate></span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Call-to-action bar for Detail & Public Transit Guide */}
+                    <div className="w-full py-2 px-3 rounded-xl bg-stone-900 group-hover:bg-amber-400 text-white group-hover:text-stone-950 font-semibold text-[11px] flex items-center justify-between transition-colors">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Train className="w-3.5 h-3.5 text-amber-400 group-hover:text-stone-950 transition-colors" />
+                        <Translate>상세 정보 &amp; 대중교통 방문 방법 보기</Translate>
+                      </span>
+                      <span className="font-mono font-bold group-hover:translate-x-0.5 transition-transform">→</span>
+                    </div>
                   </div>
                 </motion.div>
               );
@@ -657,14 +710,21 @@ export default function FestivalsView() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {wishlistFestivals.map((fest) => (
-                <div key={fest.id} className="bg-stone-850 border border-stone-800 p-4 rounded-2xl flex flex-col justify-between space-y-4">
+                <div
+                  key={fest.id}
+                  onClick={() => handleOpenDetail(fest)}
+                  className="bg-stone-850 border border-stone-800 hover:border-amber-400/60 p-4 rounded-2xl flex flex-col justify-between space-y-4 cursor-pointer transition-all"
+                >
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[9px] font-mono bg-stone-800 text-stone-300 px-2 py-0.5 rounded-sm">
                         <Translate>{fest.season}</Translate>
                       </span>
                       <button
-                        onClick={() => handleToggleWishlist(fest.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleWishlist(fest.id);
+                        }}
                         className="text-stone-500 hover:text-red-400 transition-colors cursor-pointer"
                         title="Remove"
                       >
@@ -679,7 +739,7 @@ export default function FestivalsView() {
 
                   <div className="border-t border-stone-800 pt-3 flex items-center justify-between text-[9px] font-mono text-stone-500">
                     <span>{fest.dateRange}</span>
-                    <span className="text-amber-400"><Translate>Add to calendar</Translate></span>
+                    <span className="text-amber-400"><Translate>상세 &amp; 대중교통 보기 →</Translate></span>
                   </div>
                 </div>
               ))}
@@ -687,6 +747,8 @@ export default function FestivalsView() {
           </motion.section>
         )}
       </AnimatePresence>
+        </>
+      )}
 
       {/* Modal: Add New Cultural Festival (Admin Only) */}
       <AnimatePresence>
