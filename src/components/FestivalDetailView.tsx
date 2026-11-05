@@ -20,6 +20,7 @@ import {
   Edit3,
 } from "lucide-react";
 import { Festival } from "../types";
+import { FESTIVALS } from "../data";
 import { Translate, useTranslation } from "../context/LanguageContext";
 
 export interface FestivalTransitAndDetailInfo {
@@ -841,6 +842,12 @@ export default function FestivalDetailView({
           alt={festival.name}
           className="absolute inset-0 w-full h-full object-cover"
           referrerPolicy="no-referrer"
+          onError={(e) => {
+            const fallback = FESTIVALS.find((d) => d.id === festival.id)?.image || FESTIVALS[0]?.image;
+            if (fallback && e.currentTarget.src !== fallback) {
+              e.currentTarget.src = fallback;
+            }
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/55 to-stone-950/15" />
 
@@ -1171,6 +1178,12 @@ export default function FestivalDetailView({
                     alt={rel.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      const fallback = FESTIVALS.find((d) => d.id === rel.id)?.image || FESTIVALS[0]?.image;
+                      if (fallback && e.currentTarget.src !== fallback) {
+                        e.currentTarget.src = fallback;
+                      }
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/20 to-transparent" />
                   <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-amber-400 text-stone-950 text-[10px] font-mono font-bold">

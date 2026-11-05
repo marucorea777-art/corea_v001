@@ -120,6 +120,17 @@ export default function FestivalsView() {
     localStorage.setItem("corea_labs_wishlist", JSON.stringify(updated));
   };
 
+  // Helper: only override a default festival's image if the custom image is an external URL or data URI
+  const resolveFestivalImage = (customImg: string | undefined, defaultImg: string | undefined): string => {
+    if (!customImg) return defaultImg || seoulLanternImg;
+    const trimmed = customImg.trim();
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("data:image/")) {
+      return trimmed;
+    }
+    // If customImg was a local Vite bundle path (/src/assets/... or /assets/...) from a previous build, use current defaultImg
+    return defaultImg || trimmed || seoulLanternImg;
+  };
+
   // Combine standard and custom festivals before translation so custom cards also support multi-language view
   const combinedBaseFestivals = useMemo(() => {
     const activeDefaults = FESTIVALS.filter((f) => !deletedIds.includes(f.id));
@@ -128,7 +139,9 @@ export default function FestivalsView() {
 
     const resolvedDefaults = activeDefaults.map((df) => {
       const customOverride = customMap.get(df.id);
-      return customOverride ? { ...df, ...customOverride, image: customOverride.image || df.image } : df;
+      return customOverride
+        ? { ...df, ...customOverride, image: resolveFestivalImage(customOverride.image, df.image) }
+        : df;
     });
 
     const defaultIds = new Set<string>(activeDefaults.map((df) => df.id));
@@ -147,12 +160,14 @@ export default function FestivalsView() {
     "features",
   ]);
 
-  // Ensure custom image URLs/uploads are strictly preserved
+  // Ensure custom image URLs/uploads are strictly preserved without using stale build hashes
   const allFestivals = useMemo(() => {
     const customImageMap = new Map<string, string>(customFestivals.map((f) => [f.id, f.image]));
+    const defaultImageMap = new Map<string, string>(FESTIVALS.map((f) => [f.id, f.image]));
     return translatedFESTIVALS.map((f) => {
       const customImg = customImageMap.get(f.id);
-      return customImg ? { ...f, image: customImg } : f;
+      const defaultImg = defaultImageMap.get(f.id);
+      return { ...f, image: resolveFestivalImage(customImg, defaultImg || f.image) };
     });
   }, [translatedFESTIVALS, customFestivals]);
 
@@ -529,6 +544,12 @@ export default function FestivalsView() {
                         alt={fest.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          const fallback = FESTIVALS.find((d) => d.id === fest.id)?.image || seoulLanternImg;
+                          if (e.currentTarget.src !== fallback) {
+                            e.currentTarget.src = fallback;
+                          }
+                        }}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/20 to-transparent" />
 

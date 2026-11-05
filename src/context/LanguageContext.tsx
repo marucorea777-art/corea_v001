@@ -37,6 +37,20 @@ export const LANGUAGES: Language[] = [
   { code: "uk", name: "Ukrainian", nativeName: "Українська", flag: "🇺🇦" },
 ];
 
+const GTX_LANG_MAP: Record<LanguageCode, string> = {
+  ko: "ko",
+  en: "en",
+  ja: "ja",
+  zh: "zh-CN",
+  th: "th",
+  fr: "fr",
+  es: "es",
+  pt: "pt",
+  ka: "ka",
+  ru: "ru",
+  uk: "uk",
+};
+
 interface LanguageContextType {
   language: LanguageCode;
   setLanguage: (lang: LanguageCode) => void;
@@ -53,29 +67,126 @@ const containsKorean = (text: string): boolean => {
   return /[\uac00-\ud7af]/u.test(text);
 };
 
-// Build bidirectional reverse index from Korean translations back to English canonical keys
+// Build bidirectional reverse index between Korean strings and English canonical keys,
+// plus a per-language set of already-translated target values so double-wrapped strings (<Translate> inside useTranslatedData) return in 0ms
 const koreanToEnglishMap: Record<string, string> = {};
+const englishToKoreanMap: Record<string, string> = {};
+const knownTargetValuesByLang: Record<string, Set<string>> = {};
 
-const populateReverseMap = (dict: Record<string, string> | undefined) => {
+const populateReverseMap = (dict: Record<string, string> | undefined, lang?: string) => {
   if (!dict) return;
-  for (const [engKey, koVal] of Object.entries(dict)) {
-    if (koVal && typeof koVal === "string" && containsKorean(koVal)) {
-      const trimmedVal = koVal.trim();
-      koreanToEnglishMap[trimmedVal] = engKey;
-      koreanToEnglishMap[koVal] = engKey;
+  const targetSet = lang ? (knownTargetValuesByLang[lang] || (knownTargetValuesByLang[lang] = new Set<string>())) : null;
+  for (const [k, v] of Object.entries(dict)) {
+    if (!k || !v || typeof v !== "string") continue;
+    if (targetSet) {
+      targetSet.add(v);
+      targetSet.add(v.trim());
+    }
+    if (lang === "ko" || lang === "en" || !lang) {
+      // Case 1: English key -> Korean value
+      if (!containsKorean(k) && containsKorean(v)) {
+        const trimmedKo = v.trim();
+        const trimmedEn = k.trim();
+        koreanToEnglishMap[trimmedKo] = k;
+        koreanToEnglishMap[v] = k;
+        englishToKoreanMap[trimmedEn] = v;
+        englishToKoreanMap[k] = v;
+      }
+      // Case 2: Korean key -> English value
+      if (containsKorean(k) && !containsKorean(v)) {
+        const trimmedKo = k.trim();
+        const trimmedEn = v.trim();
+        koreanToEnglishMap[trimmedKo] = v;
+        koreanToEnglishMap[k] = v;
+        englishToKoreanMap[trimmedEn] = k;
+        englishToKoreanMap[v] = k;
+      }
     }
   }
 };
 
-if (UI_DICTIONARY && UI_DICTIONARY.ko) {
-  populateReverseMap(UI_DICTIONARY.ko);
+for (const l of LANGUAGES) {
+  populateReverseMap(UI_DICTIONARY?.[l.code], l.code);
+  populateReverseMap(CARD_TRANSLATIONS?.[l.code], l.code);
+  populateReverseMap(STATIC_TRANSLATIONS?.[l.code], l.code);
 }
-if (CARD_TRANSLATIONS && CARD_TRANSLATIONS.ko) {
-  populateReverseMap(CARD_TRANSLATIONS.ko);
+
+// Validate whether a candidate dictionary value is actually translated for targetLang
+function isValidDictValue(key: string, val: string | undefined, targetLang: LanguageCode): val is string {
+  if (!val || typeof val !== "string" || !val.trim()) return false;
+  if (targetLang === "ko") {
+    return containsKorean(val);
+  }
+  if (targetLang === "en") {
+    return !containsKorean(val);
+  }
+  // For ja, zh, th, fr, es, pt, ka, ru, uk:
+  // Reject if value still contains Korean characters
+  if (containsKorean(val)) return false;
+  return true;
 }
-if (STATIC_TRANSLATIONS && STATIC_TRANSLATIONS.ko) {
-  populateReverseMap(STATIC_TRANSLATIONS.ko);
+
+async function translateViaBrowserMultiQ(texts: string[], targetLang: LanguageCode): Promise<(string | null)[]> {
+  if (texts.length === 0) return [];
+  const tl = GTX_LANG_MAP[targetLang] || targetLang;
+
+  // Primary: clients5 multi-q batch endpoint
+  try {
+    const url = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=${encodeURIComponent(tl)}`;
+    const params = new URLSearchParams();
+    for (const t of texts) {
+      params.append("q", t);
+    }
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params.toString(),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length === texts.length) {
+        return data.map((item: any) => {
+          if (Array.isArray(item) && typeof item[0] === "string" && item[0].trim()) {
+            return item[0].trim();
+          }
+          if (typeof item === "string" && item.trim()) {
+            return item.trim();
+          }
+          return null;
+        });
+      }
+    }
+  } catch {
+    // Fall through to single GTX endpoint
+  }
+
+  // Secondary fallback: translate.googleapis.com single requests
+  return Promise.all(
+    texts.map(async (text) => {
+      try {
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(tl)}&dt=t&q=${encodeURIComponent(text)}`;
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (Array.isArray(data) && Array.isArray(data[0])) {
+          const joined = data[0]
+            .map((part: any) => (Array.isArray(part) && typeof part[0] === "string" ? part[0] : ""))
+            .join("");
+          if (joined.trim()) {
+            return joined.trim();
+          }
+        }
+      } catch {
+        // ignore
+      }
+      return null;
+    })
+  );
 }
+
+const CACHE_KEY_PREFIX = "corea_labs_cache_v4_";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<LanguageCode>(() => {
@@ -108,10 +219,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     return "en";
   });
 
-  // Persistent translation cache for dynamic / background AI translations
+  // Persistent translation cache for dynamic / custom strings
   const [translationCache, setTranslationCache] = useState<Record<string, string>>(() => {
     try {
-      const saved = localStorage.getItem(`corea_labs_cache_${language}`);
+      const saved = localStorage.getItem(`${CACHE_KEY_PREFIX}${language}`);
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -119,12 +230,17 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [cacheVersion, setCacheVersion] = useState<number>(0);
+  const languageRef = useRef<LanguageCode>(language);
+  languageRef.current = language;
 
   // Switch language and load its persisted cache
   const setLanguage = useCallback((lang: LanguageCode) => {
+    languageRef.current = lang;
+    pendingQueueRef.current.clear();
+    inFlightRef.current.clear();
     try {
       localStorage.setItem("corea_labs_lang", lang);
-      const saved = localStorage.getItem(`corea_labs_cache_${lang}`);
+      const saved = localStorage.getItem(`${CACHE_KEY_PREFIX}${lang}`);
       setTranslationCache(saved ? JSON.parse(saved) : {});
     } catch {
       setTranslationCache({});
@@ -136,72 +252,63 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   // Background non-blocking translation queue
   const pendingQueueRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Background processor: sends batches to /api/translate quietly without blocking UI
-  const processPendingBatch = useCallback(() => {
-    if (language === "en") return;
+  // Background processor: translates any dynamic / custom strings directly in the browser
+  const processPendingBatch = useCallback(async () => {
+    const activeLang = languageRef.current;
     const itemsToFetch: string[] = [];
 
     pendingQueueRef.current.forEach(text => {
-      if (!inFlightRef.current.has(text) && itemsToFetch.length < 35) {
+      if (!inFlightRef.current.has(`${activeLang}:${text}`) && itemsToFetch.length < 40) {
         itemsToFetch.push(text);
-        inFlightRef.current.add(text);
+        inFlightRef.current.add(`${activeLang}:${text}`);
         pendingQueueRef.current.delete(text);
       }
     });
 
     if (itemsToFetch.length === 0) return;
 
-    const targetLangObj = LANGUAGES.find(l => l.code === language);
-    const targetLanguageName = targetLangObj ? targetLangObj.name : "English";
+    const batchResults: Record<string, string> = {};
+    const translatedList = await translateViaBrowserMultiQ(itemsToFetch, activeLang);
 
-    fetch("/api/translate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        texts: itemsToFetch,
-        targetLanguage: targetLanguageName
-      }),
-    })
-      .then(res => res.json())
-      .then(data => {
-        const translations: string[] = data.translations || [];
-        let updatedCount = 0;
-        const newCache = { ...translationCache };
+    itemsToFetch.forEach((orig, idx) => {
+      const translated = translatedList[idx];
+      if (translated && isValidDictValue(orig, translated, activeLang)) {
+        batchResults[orig] = translated;
+        knownTargetValuesByLang[activeLang]?.add(translated);
+      } else {
+        inFlightRef.current.delete(`${activeLang}:${orig}`);
+      }
+    });
 
-        itemsToFetch.forEach((orig, idx) => {
-          const trans = translations[idx];
-          if (trans && trans !== orig) {
-            newCache[orig] = trans;
-            updatedCount++;
-          }
-        });
-
-        if (updatedCount > 0) {
-          setTranslationCache(newCache);
-          try {
-            localStorage.setItem(`corea_labs_cache_${language}`, JSON.stringify(newCache));
-          } catch {
-            // ignore
-          }
-          setCacheVersion(v => v + 1);
+    if (Object.keys(batchResults).length > 0 && languageRef.current === activeLang) {
+      setTranslationCache(prev => {
+        const next = { ...prev, ...batchResults };
+        try {
+          localStorage.setItem(`${CACHE_KEY_PREFIX}${activeLang}`, JSON.stringify(next));
+        } catch {
+          // ignore
         }
-      })
-      .catch(err => {
-        console.warn("Background AI translation error:", err);
-      })
-      .finally(() => {
-        // If there are more items, process next batch after a gentle pause
-        if (pendingQueueRef.current.size > 0) {
-          setTimeout(processPendingBatch, 600);
-        }
+        return next;
       });
-  }, [language, translationCache]);
+      setCacheVersion(v => v + 1);
+    }
+
+    if (pendingQueueRef.current.size > 0) {
+      setTimeout(processPendingBatch, 100);
+    }
+  }, []);
 
   const queueBackgroundTranslation = useCallback((text: string) => {
     if (!text || text.trim().length <= 1) return;
-    if (language === "en" || inFlightRef.current.has(text)) return;
+    const activeLang = languageRef.current;
+    if (activeLang === "ko" && containsKorean(text)) return;
+    if (activeLang === "en" && !containsKorean(text)) return;
+    if (knownTargetValuesByLang[activeLang]?.has(text) || knownTargetValuesByLang[activeLang]?.has(text.trim())) {
+      return;
+    }
+    if (inFlightRef.current.has(`${activeLang}:${text}`)) return;
     if (translationCache[text]) return;
 
     pendingQueueRef.current.add(text);
@@ -212,29 +319,35 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     debounceTimerRef.current = setTimeout(() => {
       debounceTimerRef.current = null;
       processPendingBatch();
-    }, 350);
-  }, [language, translationCache, processPendingBatch]);
+    }, 60);
+  }, [translationCache, processPendingBatch]);
 
-  // Instant dictionary translation lookup
+  // Instant dictionary translation lookup across all 11 languages
   const t = useCallback((key: string): string => {
     if (!key || typeof key !== "string") return "";
     const trimmed = key.trim();
     if (!trimmed) return key;
+
+    // Fast path: if key is already a known translated string in the active target language, return it immediately
+    if (knownTargetValuesByLang[language]?.has(key) || knownTargetValuesByLang[language]?.has(trimmed)) {
+      return key;
+    }
 
     // 1. Target language: Korean
     if (language === "ko") {
       if (containsKorean(key)) {
         return key;
       }
-      // Source key is in English or non-Korean: look up Korean dictionary
-      if (CARD_TRANSLATIONS.ko?.[key]) return CARD_TRANSLATIONS.ko[key];
-      if (CARD_TRANSLATIONS.ko?.[trimmed]) return CARD_TRANSLATIONS.ko[trimmed];
-      if (UI_DICTIONARY.ko?.[key]) return UI_DICTIONARY.ko[key];
-      if (UI_DICTIONARY.ko?.[trimmed]) return UI_DICTIONARY.ko[trimmed];
-      if (STATIC_TRANSLATIONS.ko?.[key]) return STATIC_TRANSLATIONS.ko[key];
-      if (STATIC_TRANSLATIONS.ko?.[trimmed]) return STATIC_TRANSLATIONS.ko[trimmed];
-      if (translationCache[key]) return translationCache[key];
-      if (translationCache[trimmed]) return translationCache[trimmed];
+      if (isValidDictValue(key, CARD_TRANSLATIONS.ko?.[key], "ko")) return CARD_TRANSLATIONS.ko[key];
+      if (isValidDictValue(trimmed, CARD_TRANSLATIONS.ko?.[trimmed], "ko")) return CARD_TRANSLATIONS.ko[trimmed];
+      if (isValidDictValue(key, UI_DICTIONARY.ko?.[key], "ko")) return UI_DICTIONARY.ko[key];
+      if (isValidDictValue(trimmed, UI_DICTIONARY.ko?.[trimmed], "ko")) return UI_DICTIONARY.ko[trimmed];
+      if (isValidDictValue(key, STATIC_TRANSLATIONS.ko?.[key], "ko")) return STATIC_TRANSLATIONS.ko[key];
+      if (isValidDictValue(trimmed, STATIC_TRANSLATIONS.ko?.[trimmed], "ko")) return STATIC_TRANSLATIONS.ko[trimmed];
+      if (englishToKoreanMap[key]) return englishToKoreanMap[key];
+      if (englishToKoreanMap[trimmed]) return englishToKoreanMap[trimmed];
+      if (isValidDictValue(key, translationCache[key], "ko")) return translationCache[key];
+      if (isValidDictValue(trimmed, translationCache[trimmed], "ko")) return translationCache[trimmed];
       queueBackgroundTranslation(key);
       return key;
     }
@@ -242,17 +355,24 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     // 2. Target language: English
     if (language === "en") {
       if (!containsKorean(key)) {
-        if (CARD_TRANSLATIONS.en?.[key]) return CARD_TRANSLATIONS.en[key];
-        if (CARD_TRANSLATIONS.en?.[trimmed]) return CARD_TRANSLATIONS.en[trimmed];
+        if (isValidDictValue(key, CARD_TRANSLATIONS.en?.[key], "en")) return CARD_TRANSLATIONS.en[key];
+        if (isValidDictValue(trimmed, CARD_TRANSLATIONS.en?.[trimmed], "en")) return CARD_TRANSLATIONS.en[trimmed];
         return key;
       }
-      // Source key is Korean: translate back to English via reverse map
+      // Check English dictionaries directly (for Korean keys mapped to English)
+      if (isValidDictValue(key, STATIC_TRANSLATIONS.en?.[key], "en")) return STATIC_TRANSLATIONS.en[key];
+      if (isValidDictValue(trimmed, STATIC_TRANSLATIONS.en?.[trimmed], "en")) return STATIC_TRANSLATIONS.en[trimmed];
+      if (isValidDictValue(key, UI_DICTIONARY.en?.[key], "en")) return UI_DICTIONARY.en[key];
+      if (isValidDictValue(trimmed, UI_DICTIONARY.en?.[trimmed], "en")) return UI_DICTIONARY.en[trimmed];
+      if (isValidDictValue(key, CARD_TRANSLATIONS.en?.[key], "en")) return CARD_TRANSLATIONS.en[key];
+      if (isValidDictValue(trimmed, CARD_TRANSLATIONS.en?.[trimmed], "en")) return CARD_TRANSLATIONS.en[trimmed];
+
       const engFromKo = koreanToEnglishMap[key] || koreanToEnglishMap[trimmed];
       if (engFromKo) {
         return engFromKo;
       }
-      if (translationCache[key]) return translationCache[key];
-      if (translationCache[trimmed]) return translationCache[trimmed];
+      if (isValidDictValue(key, translationCache[key], "en")) return translationCache[key];
+      if (isValidDictValue(trimmed, translationCache[trimmed], "en")) return translationCache[trimmed];
       queueBackgroundTranslation(key);
       return key;
     }
@@ -260,45 +380,69 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     // 3. Any other target language (ja, zh, th, fr, es, pt, ka, ru, uk)
     const cardDict = CARD_TRANSLATIONS[language];
     if (cardDict) {
-      if (cardDict[key]) return cardDict[key];
-      if (cardDict[trimmed]) return cardDict[trimmed];
+      if (isValidDictValue(key, cardDict[key], language)) return cardDict[key];
+      if (isValidDictValue(trimmed, cardDict[trimmed], language)) return cardDict[trimmed];
     }
 
     const dict = UI_DICTIONARY[language];
     if (dict) {
-      if (dict[key]) return dict[key];
-      if (dict[trimmed]) return dict[trimmed];
+      if (isValidDictValue(key, dict[key], language)) return dict[key];
+      if (isValidDictValue(trimmed, dict[trimmed], language)) return dict[trimmed];
     }
 
     const staticDict = STATIC_TRANSLATIONS[language];
     if (staticDict) {
-      if (staticDict[key]) return staticDict[key];
-      if (staticDict[trimmed]) return staticDict[trimmed];
+      if (isValidDictValue(key, staticDict[key], language)) return staticDict[key];
+      if (isValidDictValue(trimmed, staticDict[trimmed], language)) return staticDict[trimmed];
     }
 
-    // If source key is Korean, find its canonical English key and look that up in the target language dictionary
+    // If source key is Korean, also check via canonical English key
     let engKey: string | undefined;
     if (containsKorean(key)) {
-      engKey = koreanToEnglishMap[key] || koreanToEnglishMap[trimmed];
+      engKey =
+        STATIC_TRANSLATIONS.en?.[key] ||
+        STATIC_TRANSLATIONS.en?.[trimmed] ||
+        UI_DICTIONARY.en?.[key] ||
+        UI_DICTIONARY.en?.[trimmed] ||
+        koreanToEnglishMap[key] ||
+        koreanToEnglishMap[trimmed];
       if (engKey) {
-        if (cardDict?.[engKey]) return cardDict[engKey];
-        if (cardDict?.[engKey.trim()]) return cardDict[engKey.trim()];
-        if (dict?.[engKey]) return dict[engKey];
-        if (dict?.[engKey.trim()]) return dict[engKey.trim()];
-        if (staticDict?.[engKey]) return staticDict[engKey];
-        if (staticDict?.[engKey.trim()]) return staticDict[engKey.trim()];
+        const trimmedEng = engKey.trim();
+        if (isValidDictValue(engKey, cardDict?.[engKey], language)) return cardDict![engKey];
+        if (isValidDictValue(trimmedEng, cardDict?.[trimmedEng], language)) return cardDict![trimmedEng];
+        if (isValidDictValue(engKey, dict?.[engKey], language)) return dict![engKey];
+        if (isValidDictValue(trimmedEng, dict?.[trimmedEng], language)) return dict![trimmedEng];
+        if (isValidDictValue(engKey, staticDict?.[engKey], language)) return staticDict![engKey];
+        if (isValidDictValue(trimmedEng, staticDict?.[trimmedEng], language)) return staticDict![trimmedEng];
+      }
+    } else {
+      // Source key is English: also check if the target dictionary indexed it under its Korean counterpart
+      const koCounterpart =
+        STATIC_TRANSLATIONS.ko?.[key] ||
+        STATIC_TRANSLATIONS.ko?.[trimmed] ||
+        UI_DICTIONARY.ko?.[key] ||
+        UI_DICTIONARY.ko?.[trimmed] ||
+        englishToKoreanMap[key] ||
+        englishToKoreanMap[trimmed];
+      if (koCounterpart) {
+        const trimmedKo = koCounterpart.trim();
+        if (isValidDictValue(koCounterpart, cardDict?.[koCounterpart], language)) return cardDict![koCounterpart];
+        if (isValidDictValue(trimmedKo, cardDict?.[trimmedKo], language)) return cardDict![trimmedKo];
+        if (isValidDictValue(koCounterpart, dict?.[koCounterpart], language)) return dict![koCounterpart];
+        if (isValidDictValue(trimmedKo, dict?.[trimmedKo], language)) return dict![trimmedKo];
+        if (isValidDictValue(koCounterpart, staticDict?.[koCounterpart], language)) return staticDict![koCounterpart];
+        if (isValidDictValue(trimmedKo, staticDict?.[trimmedKo], language)) return staticDict![trimmedKo];
       }
     }
 
     // Dynamic cache check
-    if (translationCache[key]) return translationCache[key];
-    if (translationCache[trimmed]) return translationCache[trimmed];
-    if (engKey && translationCache[engKey]) return translationCache[engKey];
+    if (isValidDictValue(key, translationCache[key], language)) return translationCache[key];
+    if (isValidDictValue(trimmed, translationCache[trimmed], language)) return translationCache[trimmed];
+    if (engKey && isValidDictValue(engKey, translationCache[engKey], language)) return translationCache[engKey];
 
-    // Queue for AI translation in background if available
-    queueBackgroundTranslation(engKey || key);
+    // Queue for instant browser translation in background
+    queueBackgroundTranslation(key);
 
-    // Fallback: return English key if found instead of raw Korean to avoid alien characters
     return engKey || key;
   }, [language, translationCache, queueBackgroundTranslation]);
 
@@ -372,7 +516,7 @@ export function useTranslatedData<T>(
     if (!originalData) return originalData;
 
     // Helper to translate strings, string arrays, or nested objects
-    const translateValue = (val: any, fieldKey?: string): any => {
+    const translateValue = (val: any): any => {
       if (typeof val === "string") {
         return t(val);
       }
@@ -381,7 +525,6 @@ export function useTranslatedData<T>(
           if (typeof item === "string") {
             return t(item);
           }
-          // Array of objects (like attractions [{ name, desc }], itinerary [{ activity, desc }])
           if (item && typeof item === "object") {
             const translatedSub: any = { ...item };
             for (const subKey of Object.keys(translatedSub)) {
@@ -394,7 +537,6 @@ export function useTranslatedData<T>(
           return item;
         });
       }
-      // Nested objects (like travelTips: { bestTime, mustTry, hiddenGem })
       if (val && typeof val === "object") {
         const translatedObj: any = { ...val };
         for (const subKey of Object.keys(translatedObj)) {
@@ -416,11 +558,10 @@ export function useTranslatedData<T>(
 
         for (const k of keys) {
           if (k in copy && copy[k] !== undefined) {
-            // When target language is Korean and item has koreanName, prefer it for name/title
             if (language === "ko" && (k === "name" || k === "title") && item.koreanName) {
               copy[k] = item.koreanName;
             } else {
-              copy[k] = translateValue(copy[k], k);
+              copy[k] = translateValue(copy[k]);
             }
           }
         }
@@ -433,7 +574,7 @@ export function useTranslatedData<T>(
           if (language === "ko" && (k === "name" || k === "title") && (originalData as any).koreanName) {
             copy[k] = (originalData as any).koreanName;
           } else {
-            copy[k] = translateValue(copy[k], k);
+            copy[k] = translateValue(copy[k]);
           }
         }
       }

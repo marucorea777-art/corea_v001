@@ -621,7 +621,7 @@ export default function TravelView() {
                 href="tel:1330"
                 className="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-stone-950 text-xs font-bold text-center transition-colors cursor-pointer"
               >
-                📞 Call 1330 Now
+                📞 <Translate>Call 1330 Now</Translate>
               </a>
               <button
                 onClick={() => {
@@ -633,7 +633,7 @@ export default function TravelView() {
                 title="Share this Travel Guide"
               >
                 {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedLink ? "Copied" : "Share Guide"}</span>
+                <span>{copiedLink ? <Translate>Copied</Translate> : <Translate>Share Guide</Translate>}</span>
               </button>
             </div>
           </div>
