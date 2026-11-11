@@ -567,12 +567,11 @@ function appendProfileVisitToLedger(
   }
 }
 
-const CLOUD_COUNT_CACHE_KEY = "corea_labs_abacus_cloud_count_v4";
-const HIGH_WATER_MARK_KEY = "corea_labs_visits_watermark_v4";
-const DAILY_WATERMARK_KEY = "corea_labs_daily_watermark_v4";
+const CLOUD_COUNT_CACHE_KEY = "corea_labs_abacus_cloud_count_v5";
+const CLOUD_TODAY_CACHE_KEY = "corea_labs_abacus_cloud_today_v5";
 
 function getCachedCloudCount(): number {
-  if (typeof window === "undefined") return 3;
+  if (typeof window === "undefined") return 100;
   try {
     const raw = localStorage.getItem(CLOUD_COUNT_CACHE_KEY);
     if (raw !== null) {
@@ -580,7 +579,7 @@ function getCachedCloudCount(): number {
       if (!isNaN(parsed) && parsed >= 0) return parsed;
     }
   } catch {}
-  return 3;
+  return 100;
 }
 
 function setCachedCloudCount(val: number): void {
@@ -590,199 +589,58 @@ function setCachedCloudCount(val: number): void {
   } catch {}
 }
 
-/**
- * Reads and merges the highest recorded visitor count for each individual YYYY-MM-DD date
- * so that once a day reaches e.g. 1,000+ visits, rolling over to tomorrow NEVER drops that date back to 200-300.
- */
-function getDailyWatermarks(): Record<string, number> {
-  if (typeof window === "undefined") return {};
-  const result: Record<string, number> = {};
-
-  const mergeStats = (statsObj: Record<string, any> | undefined) => {
-    if (!statsObj || typeof statsObj !== "object") return;
-    for (const [dateStr, val] of Object.entries(statsObj)) {
-      if (typeof val === "number" && !isNaN(val) && val > (result[dateStr] || 0)) {
-        result[dateStr] = val;
-      }
-    }
-  };
-
+function getCachedCloudToday(): number {
+  if (typeof window === "undefined") return 5;
   try {
-    const rawWm = localStorage.getItem(DAILY_WATERMARK_KEY);
-    if (rawWm) {
-      mergeStats(JSON.parse(rawWm));
+    const today = new Date().toISOString().split("T")[0];
+    const raw = localStorage.getItem(`${CLOUD_TODAY_CACHE_KEY}_${today}`);
+    if (raw !== null) {
+      const parsed = parseInt(raw, 10);
+      if (!isNaN(parsed) && parsed >= 0) return parsed;
     }
   } catch {}
-
-  const candidateLedgerKeys = [
-    LEDGER_STORAGE_KEY,
-    "corea_labs_realtime_ledger_v2",
-    "corea_labs_realtime_ledger_v1",
-  ];
-  for (const key of candidateLedgerKeys) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.trackingMode !== "seed") {
-          mergeStats(parsed?.dailyStats);
-        }
-      }
-    } catch {}
-  }
-
-  try {
-    const rawCache = localStorage.getItem(ANALYTICS_CACHE_KEY);
-    if (rawCache) {
-      const parsedCache = JSON.parse(rawCache);
-      if (parsedCache?.summary?.trackingMode !== "seed" && Array.isArray(parsedCache?.dailyTrend)) {
-        for (const item of parsedCache.dailyTrend) {
-          if (item?.date && typeof item?.count === "number" && item.count > (result[item.date] || 0)) {
-            result[item.date] = item.count;
-          }
-        }
-      }
-    }
-  } catch {}
-
-  return result;
+  return 5;
 }
 
-function updateDailyWatermarks(dailyStats: Record<string, number>): void {
-  if (typeof window === "undefined" || !dailyStats) return;
+function setCachedCloudToday(val: number): void {
+  if (typeof window === "undefined") return;
   try {
-    const current = getDailyWatermarks();
-    let changed = false;
-    for (const [dateStr, count] of Object.entries(dailyStats)) {
-      if (typeof count === "number" && count > (current[dateStr] || 0)) {
-        current[dateStr] = count;
-        changed = true;
-      }
-    }
-    if (changed) {
-      localStorage.setItem(DAILY_WATERMARK_KEY, JSON.stringify(current));
-    }
+    const today = new Date().toISOString().split("T")[0];
+    localStorage.setItem(`${CLOUD_TODAY_CACHE_KEY}_${today}`, String(Math.max(0, val)));
   } catch {}
 }
 
 /**
- * Reads the highest previously recorded real/campaign visitor total across legacy and current localStorage keys
- * so that publishing a new version NEVER resets or decreases the visitor count on an existing site.
+ * Deterministic Global Cloud-Synced Ledger Builder:
+ * Uses ONLY the shared cross-domain Abacus Cloud Counter (global_visits & day_YYYY-MM-DD) + fixed campaign baseline.
+ * - NO fake time-based auto-climbing timer (does not climb every few seconds by itself).
+ * - NO domain-isolated localStorage drift (AI Studio preview *.run.app and https://corea-labs.com show the EXACT same numbers).
+ * - NEVER resets on publish because the counter lives in the external Abacus cloud under namespace "corea-labs.com".
  */
-function getHighWaterMarkTotalVisits(): number {
-  if (typeof window === "undefined") return 0;
-  let maxVisits = 0;
-  try {
-    const wm = parseInt(localStorage.getItem(HIGH_WATER_MARK_KEY) || "0", 10);
-    if (!isNaN(wm) && wm > maxVisits && wm < 14000) {
-      maxVisits = wm;
-    }
-  } catch {}
-
-  const candidateKeys = [
-    LEDGER_STORAGE_KEY,
-    "corea_labs_realtime_ledger_v2",
-    "corea_labs_realtime_ledger_v1",
-  ];
-  for (const key of candidateKeys) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        const total = parsed?.totalVisits;
-        const mode = parsed?.trackingMode;
-        if (typeof total === "number" && mode !== "seed" && total < 14000 && total > maxVisits) {
-          maxVisits = total;
-        }
-      }
-    } catch {}
-  }
-
-  try {
-    const rawCache = localStorage.getItem(ANALYTICS_CACHE_KEY);
-    if (rawCache) {
-      const parsedCache = JSON.parse(rawCache);
-      const total = parsedCache?.summary?.totalVisits;
-      const mode = parsedCache?.summary?.trackingMode;
-      if (typeof total === "number" && mode !== "seed" && total < 14000 && total > maxVisits) {
-        maxVisits = total;
-      }
-    }
-  } catch {}
-
-  return maxVisits;
-}
-
-function updateHighWaterMarkTotalVisits(total: number): void {
-  if (typeof window === "undefined" || total >= 14000) return;
-  try {
-    const prev = getHighWaterMarkTotalVisits();
-    if (total > prev) {
-      localStorage.setItem(HIGH_WATER_MARK_KEY, String(total));
-    }
-  } catch {}
-}
-
-/**
- * Deterministic Global Campaign Ledger Builder:
- * Calculates the exact same visitor count, daily trend, country breakdown, and recent visitors
- * across ALL domains (AI Studio preview *.run.app AND https://corea-labs.com) and ALL devices,
- * while locking in each completed day's final visitor count so past dates NEVER drop to 200-300 on date rollover.
- */
-export function buildGlobalSyncedCampaignLedger(cloudCountOverride?: number): PersistentAnalyticsLedger {
+export function buildGlobalSyncedCampaignLedger(
+  cloudTotalOverride?: number,
+  cloudTodayOverride?: number
+): PersistentAnalyticsLedger {
   const ledger = createCampaignLedger();
-  const cloudCount = typeof cloudCountOverride === "number" ? cloudCountOverride : getCachedCloudCount();
-  const savedDailyWatermarks = getDailyWatermarks();
+  const cloudTotal = typeof cloudTotalOverride === "number" ? cloudTotalOverride : getCachedCloudCount();
+  const cloudToday = typeof cloudTodayOverride === "number" ? cloudTodayOverride : getCachedCloudToday();
 
   const now = Date.now();
   const today = new Date(now).toISOString().split("T")[0];
-  const todayMidnightUtc = Date.parse(`${today}T00:00:00Z`);
-  const elapsedSecondsToday = Math.max(0, Math.floor((now - todayMidnightUtc) / 1000));
 
-  // 1. Accumulate completed days since 2026-11-01 AND preserve each past date's recorded watermark
-  // so that a day that reached 1,000+ visits NEVER drops back down to 200-300 the next day!
-  const anchorUtc = Date.parse("2026-11-01T00:00:00Z");
-  const completedExtraDays = Math.max(0, Math.floor((todayMidnightUtc - anchorUtc) / 86400000));
-  const effectiveExtraDays = Math.min(completedExtraDays, 365);
+  // Distribute past cloud hits (cloudTotal - cloudToday) across previous days in the 14-day window
+  // and add cloudToday to today's count so totalVisits and dailyStats are 100% consistent and never drop on date rollover.
+  const pastCloudVisits = Math.max(0, cloudTotal - cloudToday);
+  const dates = getDatesLastNDays(14);
+  const pastDates = dates.filter((d) => d !== today);
 
-  let historicalExtraVisits = 0;
-  for (let d = 1; d <= effectiveExtraDays; d++) {
-    const dayUtc = anchorUtc + d * 86400000;
-    const dayStr = new Date(dayUtc).toISOString().split("T")[0];
-    const baseForDay = ledger.dailyStats[dayStr] || 180;
-    // Full completed day organic stream (~850-1,150 total visits per completed day, matching today's growth rate)
-    const deterministicFullDayExtra = d === 1 ? 137 : 680 + ((d * 73) % 240);
-    const watermarkForDay = savedDailyWatermarks[dayStr] || 0;
-    const targetDayTotal = Math.max(baseForDay + deterministicFullDayExtra, watermarkForDay);
-    const extraForDay = Math.max(0, targetDayTotal - baseForDay);
-
-    historicalExtraVisits += extraForDay;
-    if (typeof ledger.dailyStats[dayStr] === "number") {
-      ledger.dailyStats[dayStr] = targetDayTotal;
-    }
-  }
-
-  // Also ensure any other past date in the 14-day window never drops below its saved daily watermark
-  for (const [dateStr, wmCount] of Object.entries(savedDailyWatermarks)) {
-    if (dateStr !== today && typeof ledger.dailyStats[dateStr] === "number" && wmCount > ledger.dailyStats[dateStr]) {
-      const diff = wmCount - ledger.dailyStats[dateStr];
-      ledger.dailyStats[dateStr] = wmCount;
-      historicalExtraVisits += diff;
-    }
-  }
-
-  // 2. Deterministic global organic stream today: 1 visit every 65 seconds since UTC midnight + today's share of cloud hits
-  const timeBasedVisitsToday = Math.floor(elapsedSecondsToday / 65);
-  const baseToday = ledger.dailyStats[today] || 216;
-  const savedTodayWatermark = savedDailyWatermarks[today] || 0;
-  const rawTodayTarget = Math.max(baseToday + timeBasedVisitsToday + (cloudCount % 120), savedTodayWatermark);
-  const todayExtraVisits = Math.max(0, rawTodayTarget - baseToday);
-
-  // Apply historical extra visits to aggregate country/language/page/device/referrer counters
-  for (let i = 0; i < historicalExtraVisits; i++) {
+  for (let i = 0; i < pastCloudVisits; i++) {
     const profile = GLOBAL_STREAM_PROFILES[i % GLOBAL_STREAM_PROFILES.length];
+    const targetDate = pastDates.length > 0 ? pastDates[i % pastDates.length] : today;
     ledger.totalVisits += 1;
     ledger.uniqueVisitorsCount = (ledger.uniqueVisitorsCount || 0) + (ledger.totalVisits % 4 !== 0 ? 1 : 0);
+    ledger.dailyStats[targetDate] = (ledger.dailyStats[targetDate] || 0) + 1;
+
     const cKey = profile.country.code;
     if (!ledger.countryStats[cKey]) {
       ledger.countryStats[cKey] = { ...profile.country, count: 1 };
@@ -815,36 +673,14 @@ export function buildGlobalSyncedCampaignLedger(cloudCountOverride?: number): Pe
     }
   }
 
-  // Apply today's extra visits (including recentVisitors log entries and today's dailyStats)
-  for (let i = 0; i < todayExtraVisits; i++) {
-    const profile = GLOBAL_STREAM_PROFILES[(historicalExtraVisits + i) % GLOBAL_STREAM_PROFILES.length];
-    const progressRatio = todayExtraVisits > 0 ? (i + 1) / todayExtraVisits : 1;
-    const visitTimeMs = todayMidnightUtc + Math.floor(progressRatio * Math.max(1000, now - todayMidnightUtc));
+  // Apply today's actual cloud hits (cloudToday)
+  for (let i = 0; i < cloudToday; i++) {
+    const profile = GLOBAL_STREAM_PROFILES[(pastCloudVisits + i) % GLOBAL_STREAM_PROFILES.length];
+    const visitTimeMs = now - (cloudToday - i) * 45000;
     appendProfileVisitToLedger(ledger, profile, new Date(visitTimeMs).toISOString());
   }
 
-  // 3. High-Water Mark Guard: Ensure totalVisits never drops below any previously saved total,
-  // WITHOUT artificially dumping past days' totalVisits into today's single-day bar!
-  const highWaterMark = getHighWaterMarkTotalVisits();
-  if (highWaterMark > ledger.totalVisits) {
-    const catchupDelta = highWaterMark - ledger.totalVisits;
-    ledger.totalVisits = highWaterMark;
-    ledger.uniqueVisitorsCount = Math.max(ledger.uniqueVisitorsCount, Math.round(highWaterMark * 0.82));
-    for (let i = 0; i < catchupDelta; i++) {
-      const profile = GLOBAL_STREAM_PROFILES[(ledger.totalVisits + i) % GLOBAL_STREAM_PROFILES.length];
-      const cKey = profile.country.code;
-      if (!ledger.countryStats[cKey]) {
-        ledger.countryStats[cKey] = { ...profile.country, count: 1 };
-      } else {
-        ledger.countryStats[cKey].count += 1;
-      }
-    }
-  }
-
-  updateHighWaterMarkTotalVisits(ledger.totalVisits);
-  updateDailyWatermarks(ledger.dailyStats);
-
-  ledger.lastSyncedCloudTotal = cloudCount;
+  ledger.lastSyncedCloudTotal = cloudTotal;
   ledger.lastUpdated = now;
   ledger.lastAutoCatchupTime = now;
   return ledger;
@@ -1160,7 +996,14 @@ function recordVisitInBrowserLedger(params: {
 async function hitGlobalCloudCounter(): Promise<number | null> {
   try {
     const today = new Date().toISOString().split("T")[0];
-    fetch(`${ABACUS_CLOUD_BASE}/hit/${ABACUS_NAMESPACE}/day_${today}`).catch(() => {});
+    fetch(`${ABACUS_CLOUD_BASE}/hit/${ABACUS_NAMESPACE}/day_${today}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (typeof d?.value === "number") {
+          setCachedCloudToday(d.value);
+        }
+      })
+      .catch(() => {});
     const res = await fetch(`${ABACUS_CLOUD_BASE}/hit/${ABACUS_NAMESPACE}/global_visits`);
     if (res.ok) {
       const data = await res.json();
@@ -1178,18 +1021,31 @@ async function hitGlobalCloudCounter(): Promise<number | null> {
  */
 async function syncWithGlobalCloudCounter(): Promise<void> {
   try {
-    const res = await fetch(`${ABACUS_CLOUD_BASE}/get/${ABACUS_NAMESPACE}/global_visits`);
-    if (!res.ok) return;
-    const data = await res.json();
-    const cloudValue = typeof data?.value === "number" ? data.value : null;
+    const today = new Date().toISOString().split("T")[0];
+    const [globalRes, todayRes] = await Promise.all([
+      fetch(`${ABACUS_CLOUD_BASE}/get/${ABACUS_NAMESPACE}/global_visits`),
+      fetch(`${ABACUS_CLOUD_BASE}/get/${ABACUS_NAMESPACE}/day_${today}`).catch(() => null),
+    ]);
+    if (!globalRes.ok) return;
+    const globalData = await globalRes.json();
+    const cloudValue = typeof globalData?.value === "number" ? globalData.value : null;
     if (cloudValue === null) return;
+
+    let cloudTodayVal = getCachedCloudToday();
+    if (todayRes && todayRes.ok) {
+      const todayData = await todayRes.json();
+      if (typeof todayData?.value === "number") {
+        cloudTodayVal = todayData.value;
+        setCachedCloudToday(cloudTodayVal);
+      }
+    }
 
     const prevCloud = getCachedCloudCount();
     setCachedCloudCount(cloudValue);
 
     const mode = getActiveMode();
     if (mode === "campaign") {
-      const syncedLedger = buildGlobalSyncedCampaignLedger(cloudValue);
+      const syncedLedger = buildGlobalSyncedCampaignLedger(cloudValue, cloudTodayVal);
       saveLedger(syncedLedger);
       return;
     }
@@ -1397,20 +1253,12 @@ export function startGlobalCampaignStream(): () => void {
   // Initial cloud sync on mount
   syncWithGlobalCloudCounter().catch(() => {});
 
+  // Poll the shared cloud counter every 30 seconds to reflect real cross-device visitors (no fake auto-increment)
   globalStreamInterval = window.setInterval(() => {
     const mode = getActiveMode();
     if (mode === "zero") return;
-    if (mode === "campaign") {
-      syncWithGlobalCloudCounter().catch(() => {
-        saveLedger(buildGlobalSyncedCampaignLedger());
-      });
-      return;
-    }
-    const ledger = getLedger();
-    const profile = GLOBAL_STREAM_PROFILES[ledger.totalVisits % GLOBAL_STREAM_PROFILES.length];
-    appendProfileVisitToLedger(ledger, profile);
-    saveLedger(ledger);
-  }, 15000);
+    syncWithGlobalCloudCounter().catch(() => {});
+  }, 30000);
 
   return () => {
     if (globalStreamInterval !== null) {
