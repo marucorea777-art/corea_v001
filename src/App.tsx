@@ -66,9 +66,68 @@ function MainApp() {
     };
   }, []);
 
-  // Track page views and language selections
+  // Track page views, language selections, and dynamic SEO metadata for search engine crawlers
   useEffect(() => {
     trackPageView(activeTab, language);
+
+    if (typeof document !== "undefined") {
+      const seoTitles: Record<string, Record<string, string>> = {
+        home: {
+          ko: "대한민국 연구소 | Corea Labs - 한국 여행 가이드, 문화유산 & 전국 27대 계절 축제 (11개국어)",
+          en: "Corea Labs | South Korea Travel Guide, 27 Seasonal Festivals & 5 Royal Palaces (11 Languages)",
+          ja: "Corea Labs | 韓国旅行ガイド・全国27大季節祭り・5大古宮・世界遺産 (11言語対応)",
+          zh: "Corea Labs | 韩国自由行指南・全国27大四季庆典・五大古宫与世界遗产 (11种语言)"
+        },
+        festivals: {
+          ko: "전국 27대 계절별 축제 일정 & KTX 대중교통 가이드 | 대한민국 연구소 Corea Labs",
+          en: "27 Best Seasonal Festivals in South Korea (Dates & KTX Transit Guide) | Corea Labs",
+          ja: "韓国全国27大季節のお祭り日程＆KTXアクセス完全ガイド | Corea Labs",
+          zh: "韩国全境27大四季庆典日程与KTX大众交通攻略 | Corea Labs"
+        },
+        travel: {
+          ko: "외국인 한국 여행 필수 가이드 (K-ETA, WOWPASS, T-Money, 1330) | Corea Labs",
+          en: "Essential South Korea Travel Guide: K-ETA, WOWPASS, T-Money & Naver Map | Corea Labs",
+          ja: "韓国旅行必須ガイド：K-ETA・WOWPASS・T-Money・NAVERマップ完全解説 | Corea Labs",
+          zh: "韩国自由行入境必备指南：K-ETA、WOWPASS、T-Money交通卡与地图导航 | Corea Labs"
+        },
+        places: {
+          ko: "한국 대표 도시 & 추천 명소 (서울·부산·제주·경주·전주·강릉) | Corea Labs",
+          en: "Best Places & Cities to Visit in South Korea: Seoul, Busan, Jeju, Gyeongju | Corea Labs",
+          ja: "韓国おすすめ観光都市・名所ガイド（ソウル・釜山・済州・慶州・全州）| Corea Labs",
+          zh: "韩国精选必去城市与景点攻略（首尔、釜山、济州岛、庆州、全州）| Corea Labs"
+        },
+        heritage: {
+          ko: "서울 5대 고궁 한복 무료입장 & 유네스코 세계유산 가이드 | Corea Labs",
+          en: "Seoul 5 Royal Palaces Free Hanbok Entry & UNESCO World Heritage Guide | Corea Labs",
+          ja: "ソウル5大古宮（韓服無料入場）＆ユネスコ世界遺産ガイド | Corea Labs",
+          zh: "首尔五大古宫韩服免费入场与联合国教科文组织世界遗产指南 | Corea Labs"
+        },
+        culture: {
+          ko: "한국 전통문화 가이드 (한복·한식·한옥·판소리·템플스테이) | Corea Labs",
+          en: "Traditional Korean Culture Guide: Hanbok, Hansik Cuisine, Hanok & Pansori | Corea Labs",
+          ja: "韓国伝統文化ガイド（韓服・韓食・韓屋・パンソリ・テンプルステイ）| Corea Labs",
+          zh: "韩国传统文化指南（韩服体验、韩餐礼仪、韩屋建筑、盘索里）| Corea Labs"
+        },
+        qna: {
+          ko: "글로벌 한국 여행 Q&A 커뮤니티 & 24시간 AI 컨시어지 | Corea Labs",
+          en: "Global South Korea Travel Q&A Board & 24/7 AI Concierge | Corea Labs",
+          ja: "韓国旅行グローバルQ&A掲示板＆24時間AIコンシェルジュ | Corea Labs",
+          zh: "韩国旅游全球问答社区与24小时AI旅行管家 | Corea Labs"
+        }
+      };
+
+      const sectionTitles = seoTitles[activeTab] || seoTitles.home;
+      document.title = sectionTitles[language] || sectionTitles.en;
+
+      const canonicalEl = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+      if (canonicalEl) {
+        const params = new URLSearchParams();
+        if (activeTab && activeTab !== "home") params.set("page", activeTab);
+        if (language && language !== "ko") params.set("lang", language);
+        const queryStr = params.toString();
+        canonicalEl.href = `https://corea-labs.com/${queryStr ? `?${queryStr}` : ""}`;
+      }
+    }
   }, [activeTab, language]);
 
   const handleSetTab = (tab: string) => {
@@ -76,6 +135,16 @@ function MainApp() {
       setActiveTab(tab);
     });
     if (typeof window !== "undefined") {
+      try {
+        const url = new URL(window.location.href);
+        if (tab === "home") {
+          url.searchParams.delete("page");
+          url.searchParams.delete("tab");
+        } else {
+          url.searchParams.set("page", tab);
+        }
+        window.history.replaceState({}, "", url.toString());
+      } catch {}
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };

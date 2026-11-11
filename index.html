@@ -74,6 +74,7 @@
     <meta name="apple-mobile-web-app-title" content="Corea Labs" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="alternate" type="application/rss+xml" title="Corea Labs | South Korea Festivals &amp; Travel Guide RSS" href="https://corea-labs.com/rss.xml" />
 
     <!-- Structured Data (JSON-LD) for Search Engines & Global Rich Snippets -->
     <script type="application/ld+json">
@@ -85,10 +86,16 @@
           "@id": "https://corea-labs.com/#website",
           "url": "https://corea-labs.com/",
           "name": "Corea Labs",
-          "description": "Comprehensive South Korea Travel Guide, Seasonal Festivals, and Cultural Heritage.",
+          "alternateName": ["대한민국 연구소", "Corea Labs Korea Travel Guide", "韓国旅行・祭りガイド Corea Labs", "韩国旅游庆典指南 Corea Labs"],
+          "description": "Comprehensive South Korea Travel Guide, 27 Seasonal Festivals, 5 Royal Palaces, KTX Public Transit Routes, and Cultural Heritage in 11 Languages.",
           "inLanguage": ["en", "ko", "ja", "zh", "th", "fr", "es", "ru", "uk", "ka", "pt"],
           "publisher": {
             "@id": "https://corea-labs.com/#organization"
+          },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://corea-labs.com/?page=festivals&q={search_term_string}",
+            "query-input": "required name=search_term_string"
           }
         },
         {
@@ -104,6 +111,49 @@
             "name": "South Korea"
           },
           "knowsLanguage": ["en", "ko", "ja", "zh", "th", "fr", "es", "ru", "uk", "ka", "pt"]
+        },
+        {
+          "@type": "ItemList",
+          "@id": "https://corea-labs.com/#sections",
+          "name": "South Korea Travel, Seasonal Festivals & Royal Heritage Guides",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "27 Nationwide Seasonal Festivals in South Korea (Dates & KTX Transit)",
+              "url": "https://corea-labs.com/?page=festivals"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "Foreign Traveler Essential Korea Guide (K-ETA, WOWPASS, T-Money, 1330)",
+              "url": "https://corea-labs.com/?page=travel"
+            },
+            {
+              "@type": "ListItem",
+              "position": 3,
+              "name": "Best Regional Cities & Places in South Korea (Seoul, Busan, Jeju, Gyeongju, Jeonju)",
+              "url": "https://corea-labs.com/?page=places"
+            },
+            {
+              "@type": "ListItem",
+              "position": 4,
+              "name": "5 Grand Joseon Royal Palaces & UNESCO World Heritage",
+              "url": "https://corea-labs.com/?page=heritage"
+            },
+            {
+              "@type": "ListItem",
+              "position": 5,
+              "name": "Traditional Korean Culture Guide (Hanbok, Hansik, Hanok, Pansori)",
+              "url": "https://corea-labs.com/?page=culture"
+            },
+            {
+              "@type": "ListItem",
+              "position": 6,
+              "name": "Global Traveler Q&A Community Board & 24/7 Travel Concierge",
+              "url": "https://corea-labs.com/?page=qna"
+            }
+          ]
         },
         {
           "@type": "WebApplication",
@@ -128,7 +178,7 @@
               "name": "How can foreign travelers explore South Korea festivals and heritage in their native language?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "Corea Labs (corea-labs.com) provides complete, curated guides to South Korea's nationwide seasonal festivals, 5 grand royal Joseon palaces, and top destinations translated in 11 world languages with real-time transit tips and currency guides."
+                "text": "Corea Labs (corea-labs.com) provides complete, curated guides to South Korea's 27 nationwide seasonal festivals, 5 grand royal Joseon palaces, and top destinations translated in 11 world languages with step-by-step KTX/bus transit instructions and currency guides."
               }
             },
             {
@@ -136,7 +186,7 @@
               "name": "How to get free admission to Gyeongbokgung and Seoul Royal Palaces?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "Visitors wearing traditional Korean Hanbok can enter Gyeongbokgung and other Joseon palaces for free. Full etiquette, rental tips, and guard ceremony schedules are detailed on corea-labs.com."
+                "text": "Visitors wearing traditional Korean Hanbok can enter Gyeongbokgung, Changdeokgung, Deoksugung, Changgyeonggung, and Gyeonghuigung Palaces for free. Full etiquette, rental tips, and guard ceremony schedules are detailed on https://corea-labs.com/?page=heritage"
               }
             },
             {
@@ -144,7 +194,7 @@
               "name": "What is the emergency helpline for foreign tourists in South Korea?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "Dial 1330 (Korea Travel Helpline) for 24/7 free interpretation and travel assistance in English, Japanese, and Chinese. Corea Labs offers direct one-touch connection."
+                "text": "Dial 1330 (Korea Travel Helpline) for 24/7 free interpretation and travel assistance in English, Japanese, Chinese, Russian, Thai, and Spanish. Full foreign traveler arrival tips at https://corea-labs.com/?page=travel"
               }
             }
           ]
@@ -160,6 +210,14 @@
         <header>
           <h1>Corea Labs (대한민국 연구소) — Official South Korea Travel Guide, Royal Palaces, Cultural Heritage &amp; Nationwide Seasonal Festivals in 11 Languages</h1>
           <p>Welcome to <strong>corea-labs.com</strong>, the comprehensive interactive travel guide for international visitors exploring South Korea. Available free in English, Korean (한국어), Japanese (日本語), Chinese (简体中文), Thai (ไทย), French (Français), Spanish (Español), Portuguese (Português), Russian (Русский), Ukrainian (Українська), and Georgian (ქართული).</p>
+          <nav aria-label="Primary Sections" style="margin: 1rem 0; font-weight: 600;">
+            <a href="https://corea-labs.com/?page=festivals">27 Seasonal Festivals Guide (전국 계절별 축제)</a> |
+            <a href="https://corea-labs.com/?page=travel">Foreign Traveler Essential Guide (외국인 여행 필수 가이드)</a> |
+            <a href="https://corea-labs.com/?page=places">Curated Cities &amp; Places (추천 여행지·명소)</a> |
+            <a href="https://corea-labs.com/?page=heritage">5 Royal Palaces &amp; UNESCO Heritage (5대 고궁·세계유산)</a> |
+            <a href="https://corea-labs.com/?page=culture">Traditional Korean Culture (전통 문화·한복·한식)</a> |
+            <a href="https://corea-labs.com/?page=qna">Global Traveler Q&amp;A Board (여행자 Q&amp;A 커뮤니티)</a>
+          </nav>
         </header>
         <section>
           <h2>5 Grand Joseon Royal Palaces &amp; UNESCO World Heritage in Seoul</h2>
@@ -171,17 +229,17 @@
           </ul>
         </section>
         <section>
-          <h2>Nationwide Seasonal Festivals in South Korea (전국 4계절 대표 축제)</h2>
+          <h2>Nationwide Seasonal Festivals in South Korea (전국 4계절 27대 대표 축제 &amp; KTX 대중교통 가이드)</h2>
           <ul>
-            <li><strong>Spring</strong>: Jinhae Gunhangje Cherry Blossom Festival (진해군항제), Yeouido Spring Flower Festival, Boseong Green Tea Festival.</li>
-            <li><strong>Summer</strong>: Boryeong Mud Festival (보령머드축제), Busan Sea Festival, Daegu Chimac Festival.</li>
-            <li><strong>Autumn</strong>: Andong International Mask Dance Festival (안동국제탈춤페스티벌), Jinju Namgang Yudeung Lantern Festival (진주남강유등축제), Jeonju Bibimbap Festival.</li>
-            <li><strong>Winter</strong>: Hwacheon Sancheoneo Ice Festival (화천산천어축제), Taebaeksan Snow Festival, Haeundae Light Festival.</li>
+            <li><strong>Spring</strong>: Jinhae Gunhangje Cherry Blossom Festival (진해군항제), Yeouido Spring Flower Festival (여의도 봄꽃축제), Gyeongju Cherry Blossom Festival, Gurye Sansuyu Cornelian Cherry Festival (구례 산수유꽃축제), Damyang Bamboo Festival, Boseong Green Tea Festival, Lotus Lantern Festival (연등회).</li>
+            <li><strong>Summer</strong>: Boryeong Mud Festival (보령머드축제), Daegu Chimac Chicken &amp; Beer Festival (대구치맥페스티벌), Waterbomb Seoul &amp; Busan, Pohang International Fireworks Festival, Gangneung Danoje Festival, Buyeo Seodong Lotus Festival.</li>
+            <li><strong>Autumn</strong>: Jinju Namgang Yudeung Lantern Festival (진주남강유등축제), Andong International Mask Dance Festival (안동국제탈춤페스티벌), Seoul International Fireworks Festival, Suwon Hwaseong Cultural Festival, Jeonju Bibimbap Festival, Baekje Cultural Festival.</li>
+            <li><strong>Winter</strong>: Hwacheon Sancheoneo Ice Festival (화천산천어축제), Taebaeksan Snow Festival (태백산 눈축제), Pyeongchang Trout Festival, Garden of Morning Calm Lighting Festival, Homigot Sunrise Festival.</li>
           </ul>
         </section>
         <section>
           <h2>Curated Korean Destinations &amp; Essential Foreign Traveler Guide</h2>
-          <p>Explore detailed itineraries for <strong>Seoul (서울)</strong>, <strong>Busan (부산)</strong>, <strong>Jeju Island (제주도)</strong>, <strong>Gyeongju (경주)</strong>, <strong>Gangneung (강릉)</strong>, and <strong>Jeonju Hanok Village (전주 한옥마을)</strong>. Includes practical guides for K-ETA arrival, WOWPASS &amp; currency exchange, T-Money public transit cards, eSIM setup, and the 24/7 Korea Travel Helpline (1330).</p>
+          <p>Explore detailed itineraries for <strong>Seoul (서울)</strong>, <strong>Busan (부산)</strong>, <strong>Jeju Island (제주도)</strong>, <strong>Gyeongju (경주)</strong>, <strong>Gangneung (강릉)</strong>, and <strong>Jeonju Hanok Village (전주 한옥마을)</strong>. Includes practical guides for K-ETA arrival, WOWPASS &amp; currency exchange, T-Money public transit cards, Naver Map / KakaoMap navigation, eSIM setup, and the 24/7 Korea Travel Helpline (1330).</p>
         </section>
         <nav aria-label="Multilingual Editions">
           <a href="https://corea-labs.com/?lang=en">English Guide</a> |
@@ -200,7 +258,10 @@
           <nav aria-label="Legal and Site Information">
             <a href="https://corea-labs.com/?page=privacy">개인정보처리방침 (Privacy Policy)</a> |
             <a href="https://corea-labs.com/?page=terms">이용약관 (Terms of Service)</a> |
-            <a href="https://corea-labs.com/?page=about">사이트 소개 (About Corea Labs)</a>
+            <a href="https://corea-labs.com/?page=about">사이트 소개 (About Corea Labs)</a> |
+            <a href="https://corea-labs.com/sitemap.xml">Sitemap</a> |
+            <a href="https://corea-labs.com/rss.xml">RSS Feed</a> |
+            <a href="https://corea-labs.com/llms.txt">AI Manifest (llms.txt)</a>
           </nav>
           <p style="font-size: 0.75rem; color: #57534e;">Corea Labs (https://corea-labs.com) complies with Google AdSense Publisher Policies, GDPR, and CCPA. Third-party vendors, including Google, use cookies to serve ads based on a user's prior visits. Contact: contact@corea-labs.com</p>
         </footer>

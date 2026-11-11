@@ -944,6 +944,91 @@ Respond concisely (3-6 sentences, using clean bullet points when helpful) in the
     res.send("google.com, pub-6232324178916733, DIRECT, f08c47fec0942fa0\n");
   });
 
+  // Live Global Search Engine & IndexNow Broadcast Endpoint (/api/promote/ping)
+  app.post("/api/promote/ping", async (_req, res) => {
+    const host = "corea-labs.com";
+    const key = "corealabs2026indexnowkey";
+    const keyLocation = `https://${host}/${key}.txt`;
+    const urlList = [
+      `https://${host}/`,
+      `https://${host}/?page=festivals`,
+      `https://${host}/?page=travel`,
+      `https://${host}/?page=places`,
+      `https://${host}/?page=heritage`,
+      `https://${host}/?page=culture`,
+      `https://${host}/?page=qna`,
+      `https://${host}/?lang=en`,
+      `https://${host}/?lang=ja`,
+      `https://${host}/?lang=zh`,
+      `https://${host}/?lang=es`,
+      `https://${host}/?lang=fr`,
+      `https://${host}/?lang=th`,
+      `https://${host}/?lang=ru`,
+      `https://${host}/?lang=pt`,
+      `https://${host}/?lang=uk`,
+      `https://${host}/?lang=ka`,
+      `https://${host}/?lang=ko`,
+      `https://${host}/?page=festivals&lang=en`,
+      `https://${host}/?page=festivals&lang=ja`,
+      `https://${host}/?page=festivals&lang=zh`,
+      `https://${host}/?page=travel&lang=en`,
+      `https://${host}/?page=travel&lang=ja`,
+      `https://${host}/?page=travel&lang=zh`
+    ];
+
+    const payload = { host, key, keyLocation, urlList };
+    const results: Array<{ target: string; status: number | string; ok: boolean }> = [];
+
+    const endpoints = [
+      { name: "IndexNow Global Hub (Bing / Seznam / Naver)", url: "https://api.indexnow.org/indexnow", method: "POST" },
+      { name: "Microsoft Bing IndexNow", url: "https://www.bing.com/indexnow", method: "POST" },
+      { name: "Yandex Search IndexNow", url: "https://yandex.com/indexnow", method: "POST" },
+      { name: "Naver Search Advisor IndexNow", url: "https://searchadvisor.naver.com/indexnow", method: "POST" }
+    ];
+
+    await Promise.all(
+      endpoints.map(async (ep) => {
+        try {
+          const r = await fetch(ep.url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+            body: JSON.stringify(payload)
+          });
+          results.push({ target: ep.name, status: r.status, ok: r.status >= 200 && r.status < 300 });
+        } catch (err: any) {
+          results.push({ target: ep.name, status: err?.message || "Network error", ok: false });
+        }
+      })
+    );
+
+    // Ping Google / WebSub RSS Hub for https://corea-labs.com/rss.xml
+    try {
+      const formBody = new URLSearchParams({
+        "hub.mode": "publish",
+        "hub.url": `https://${host}/rss.xml`
+      });
+      const hubRes = await fetch("https://pubsubhubbub.appspot.com/", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formBody.toString()
+      });
+      results.push({
+        target: "Google WebSub / PubSubHubbub RSS Feed",
+        status: hubRes.status,
+        ok: hubRes.status >= 200 && hubRes.status < 300
+      });
+    } catch (err: any) {
+      results.push({ target: "Google WebSub / PubSubHubbub RSS Feed", status: err?.message || "Error", ok: false });
+    }
+
+    res.json({
+      success: true,
+      submittedUrls: urlList.length,
+      timestamp: new Date().toISOString(),
+      results
+    });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
