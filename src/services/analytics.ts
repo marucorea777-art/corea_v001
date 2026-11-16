@@ -993,10 +993,38 @@ function recordVisitInBrowserLedger(params: {
 /**
  * Hit the global cross-device cloud counter (Abacus) so visits from any device worldwide are shared.
  */
+function fetchWithTimeout(url: string, timeoutMs: number = 1500): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
+/**
+ * Synchronous 0ms stats reader (Stale-While-Revalidate):
+ * Returns the latest cached or computed stats immediately on mount so the UI never waits on network latency.
+ */
+export function getAnalyticsStatsSync(): AnalyticsStatsResponse {
+  if (typeof window !== "undefined") {
+    try {
+      const cachedRaw = localStorage.getItem(ANALYTICS_CACHE_KEY);
+      if (cachedRaw) {
+        const parsed = JSON.parse(cachedRaw) as AnalyticsStatsResponse;
+        if (parsed && parsed.summary && typeof parsed.summary.totalVisits === "number") {
+          return parsed;
+        }
+      }
+    } catch {}
+  }
+  return computeStatsFromLedger(getLedger());
+}
+
+/**
+ * Hit the global cross-device cloud counter (Abacus) so visits from any device worldwide are shared.
+ */
 async function hitGlobalCloudCounter(): Promise<number | null> {
   try {
     const today = new Date().toISOString().split("T")[0];
-    fetch(`${ABACUS_CLOUD_BASE}/hit/${ABACUS_NAMESPACE}/day_${today}`)
+    fetchWithTimeout(`${ABACUS_CLOUD_BASE}/hit/${ABACUS_NAMESPACE}/day_${today}`, 1800)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (typeof d?.value === "number") {
@@ -1004,7 +1032,7 @@ async function hitGlobalCloudCounter(): Promise<number | null> {
         }
       })
       .catch(() => {});
-    const res = await fetch(`${ABACUS_CLOUD_BASE}/hit/${ABACUS_NAMESPACE}/global_visits`);
+    const res = await fetchWithTimeout(`${ABACUS_CLOUD_BASE}/hit/${ABACUS_NAMESPACE}/global_visits`, 1800);
     if (res.ok) {
       const data = await res.json();
       if (typeof data?.value === "number") {
@@ -1016,57 +1044,76 @@ async function hitGlobalCloudCounter(): Promise<number | null> {
   return null;
 }
 
+let lastCloudSyncTime = 0;
+let activeCloudSyncPromise: Promise<void> | null = null;
+
 /**
  * Read the global cross-device cloud counter and synchronize deterministic ledger across all domains.
+ * Includes request deduplication, 10s throttle, and 1.5s timeout so external server latency never slows down the app.
  */
-async function syncWithGlobalCloudCounter(): Promise<void> {
-  try {
-    const today = new Date().toISOString().split("T")[0];
-    const [globalRes, todayRes] = await Promise.all([
-      fetch(`${ABACUS_CLOUD_BASE}/get/${ABACUS_NAMESPACE}/global_visits`),
-      fetch(`${ABACUS_CLOUD_BASE}/get/${ABACUS_NAMESPACE}/day_${today}`).catch(() => null),
-    ]);
-    if (!globalRes.ok) return;
-    const globalData = await globalRes.json();
-    const cloudValue = typeof globalData?.value === "number" ? globalData.value : null;
-    if (cloudValue === null) return;
+async function syncWithGlobalCloudCounter(forceNetwork: boolean = false): Promise<void> {
+  const now = Date.now();
+  if (!forceNetwork && now - lastCloudSyncTime < 10000) {
+    return;
+  }
+  if (activeCloudSyncPromise) {
+    return activeCloudSyncPromise;
+  }
 
-    let cloudTodayVal = getCachedCloudToday();
-    if (todayRes && todayRes.ok) {
-      const todayData = await todayRes.json();
-      if (typeof todayData?.value === "number") {
-        cloudTodayVal = todayData.value;
-        setCachedCloudToday(cloudTodayVal);
+  activeCloudSyncPromise = (async () => {
+    try {
+      lastCloudSyncTime = Date.now();
+      const today = new Date().toISOString().split("T")[0];
+      const [globalRes, todayRes] = await Promise.all([
+        fetchWithTimeout(`${ABACUS_CLOUD_BASE}/get/${ABACUS_NAMESPACE}/global_visits`, 1500),
+        fetchWithTimeout(`${ABACUS_CLOUD_BASE}/get/${ABACUS_NAMESPACE}/day_${today}`, 1500).catch(() => null),
+      ]);
+      if (!globalRes.ok) return;
+      const globalData = await globalRes.json();
+      const cloudValue = typeof globalData?.value === "number" ? globalData.value : null;
+      if (cloudValue === null) return;
+
+      let cloudTodayVal = getCachedCloudToday();
+      if (todayRes && todayRes.ok) {
+        const todayData = await todayRes.json();
+        if (typeof todayData?.value === "number") {
+          cloudTodayVal = todayData.value;
+          setCachedCloudToday(cloudTodayVal);
+        }
       }
-    }
 
-    const prevCloud = getCachedCloudCount();
-    setCachedCloudCount(cloudValue);
+      const prevCloud = getCachedCloudCount();
+      setCachedCloudCount(cloudValue);
 
-    const mode = getActiveMode();
-    if (mode === "campaign") {
-      const syncedLedger = buildGlobalSyncedCampaignLedger(cloudValue, cloudTodayVal);
-      saveLedger(syncedLedger);
-      return;
-    }
-
-    const ledger = getLedger();
-    if (typeof ledger.lastSyncedCloudTotal !== "number") {
-      ledger.lastSyncedCloudTotal = cloudValue;
-      saveLedger(ledger);
-      return;
-    }
-
-    const externalDelta = cloudValue - (ledger.lastSyncedCloudTotal || prevCloud);
-    if (externalDelta > 0 && externalDelta <= 500) {
-      for (let i = 0; i < externalDelta; i++) {
-        const profile = GLOBAL_STREAM_PROFILES[(ledger.totalVisits + i) % GLOBAL_STREAM_PROFILES.length];
-        appendProfileVisitToLedger(ledger, profile);
+      const mode = getActiveMode();
+      if (mode === "campaign") {
+        const syncedLedger = buildGlobalSyncedCampaignLedger(cloudValue, cloudTodayVal);
+        saveLedger(syncedLedger);
+        return;
       }
-      ledger.lastSyncedCloudTotal = cloudValue;
-      saveLedger(ledger);
-    }
-  } catch {}
+
+      const ledger = getLedger();
+      if (typeof ledger.lastSyncedCloudTotal !== "number") {
+        ledger.lastSyncedCloudTotal = cloudValue;
+        saveLedger(ledger);
+        return;
+      }
+
+      const externalDelta = cloudValue - (ledger.lastSyncedCloudTotal || prevCloud);
+      if (externalDelta > 0 && externalDelta <= 500) {
+        for (let i = 0; i < externalDelta; i++) {
+          const profile = GLOBAL_STREAM_PROFILES[(ledger.totalVisits + i) % GLOBAL_STREAM_PROFILES.length];
+          appendProfileVisitToLedger(ledger, profile);
+        }
+        ledger.lastSyncedCloudTotal = cloudValue;
+        saveLedger(ledger);
+      }
+    } catch {}
+  })().finally(() => {
+    activeCloudSyncPromise = null;
+  });
+
+  return activeCloudSyncPromise;
 }
 
 let lastTrackedKey = "";
@@ -1082,7 +1129,7 @@ export async function trackPageView(
     const now = Date.now();
     const trackKey = `${page}:${language}`;
     if (!force && lastTrackedKey === trackKey && now - lastTrackedTime < 1500) {
-      return computeStatsFromLedger(getLedger());
+      return getAnalyticsStatsSync();
     }
     lastTrackedKey = trackKey;
     lastTrackedTime = now;
@@ -1103,9 +1150,9 @@ export async function trackPageView(
         }
       });
     } else if (getActiveMode() === "campaign") {
-      // If already counted in this session, just return the current deterministic synced ledger
-      await syncWithGlobalCloudCounter();
-      return computeStatsFromLedger(getLedger());
+      // Return instant local stats immediately and sync cloud in background (non-blocking!)
+      syncWithGlobalCloudCounter().catch(() => {});
+      return getAnalyticsStatsSync();
     }
 
     const sessionId = force
@@ -1125,20 +1172,19 @@ export async function trackPageView(
       device,
     });
 
-    try {
-      await fetch(`/api/analytics/track?_t=${now}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId,
-          language,
-          path: page,
-          referrer: channel.key,
-          timezone,
-          device,
-        }),
-      });
-    } catch {}
+    // Fire-and-forget local server log so it never blocks UI rendering
+    fetch(`/api/analytics/track?_t=${now}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId,
+        language,
+        path: page,
+        referrer: channel.key,
+        timezone,
+        device,
+      }),
+    }).catch(() => {});
 
     return updatedStats;
   } catch {
@@ -1146,10 +1192,15 @@ export async function trackPageView(
   }
 }
 
-export async function fetchAnalyticsStats(): Promise<AnalyticsStatsResponse> {
-  await syncWithGlobalCloudCounter();
+export async function fetchAnalyticsStats(forceNetwork: boolean = false): Promise<AnalyticsStatsResponse> {
+  // Trigger cloud sync in background or await up to 1.5s max if explicitly forced
+  if (forceNetwork) {
+    await syncWithGlobalCloudCounter(true);
+  } else {
+    syncWithGlobalCloudCounter(false).catch(() => {});
+  }
   const localLedger = getLedger();
-  return computeStatsFromLedger(localLedger);
+  return saveLedger(localLedger);
 }
 
 export async function resetAnalyticsData(mode: "zero" | "seed" | "campaign" = "campaign"): Promise<boolean> {

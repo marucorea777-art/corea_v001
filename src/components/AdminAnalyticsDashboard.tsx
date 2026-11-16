@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import {
   fetchAnalyticsStats,
+  getAnalyticsStatsSync,
   resetAnalyticsData,
   trackPageView,
   triggerGlobalSeoPingAndBoost,
@@ -44,8 +45,8 @@ interface AdminAnalyticsDashboardProps {
 
 export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote }: AdminAnalyticsDashboardProps) {
   const { language } = useTranslation();
-  const [stats, setStats] = useState<AnalyticsStatsResponse | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [stats, setStats] = useState<AnalyticsStatsResponse | null>(() => getAnalyticsStatsSync());
+  const [loading, setLoading] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -59,10 +60,9 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
   } | null>(null);
   const [isResetting, setIsResetting] = useState<boolean>(false);
 
-  const loadData = async (showLoadingState = true) => {
-    if (showLoadingState) setLoading(true);
+  const loadData = async (forceCloudSync = false) => {
     setIsRefreshing(true);
-    const data = await fetchAnalyticsStats();
+    const data = await fetchAnalyticsStats(forceCloudSync);
     if (data) {
       setStats(data);
     }
@@ -73,6 +73,8 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
   useEffect(() => {
     if (!isOpen) return;
 
+    // Immediately show latest synchronous stats in 0ms, then sync cloud in background
+    setStats(getAnalyticsStatsSync());
     loadData(true);
 
     // Subscribe to 0ms real-time browser ledger & cross-tab updates
@@ -80,10 +82,10 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
       setStats(updatedStats);
     });
 
-    // Silent background sync every 3 seconds
+    // Silent background sync every 15 seconds (prevents rate-limiting external cloud counter)
     const intervalId = window.setInterval(() => {
       loadData(false);
-    }, 3000);
+    }, 15000);
 
     return () => {
       unsubscribe();

@@ -20,6 +20,7 @@ import AdSenseGuard from "./components/AdSenseGuard";
 import {
   trackPageView,
   fetchAnalyticsStats,
+  getAnalyticsStatsSync,
   subscribeToAnalyticsUpdates,
   startGlobalCampaignStream
 } from "./services/analytics";
@@ -44,7 +45,13 @@ function getInitialTabFromUrl(): string {
 function MainApp() {
   const [activeTab, setActiveTab] = useState<string>(getInitialTabFromUrl);
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
-  const [liveVisitorCount, setLiveVisitorCount] = useState<{ total: number; today: number }>({ total: 784, today: 216 });
+  const [liveVisitorCount, setLiveVisitorCount] = useState<{ total: number; today: number }>(() => {
+    const initial = getAnalyticsStatsSync();
+    return {
+      total: initial?.summary?.totalVisits ?? 1500,
+      today: initial?.summary?.todayVisits ?? 145
+    };
+  });
   const { language } = useTranslation();
   const { isAdmin, showLoginModal, setShowLoginModal, logout, showAnalyticsModal, setShowAnalyticsModal } = useAdmin();
 
