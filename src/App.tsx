@@ -16,6 +16,7 @@ import AdminLoginModal from "./components/AdminLoginModal";
 import AdminAnalyticsDashboard from "./components/AdminAnalyticsDashboard";
 import GlobalShareModal from "./components/GlobalShareModal";
 import KoreaLogoIcon from "./components/KoreaLogoIcon";
+import AdSenseGuard from "./components/AdSenseGuard";
 import {
   trackPageView,
   fetchAnalyticsStats,
@@ -45,7 +46,7 @@ function MainApp() {
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   const [liveVisitorCount, setLiveVisitorCount] = useState<{ total: number; today: number }>({ total: 784, today: 216 });
   const { language } = useTranslation();
-  const { isAdmin, setShowLoginModal, logout, showAnalyticsModal, setShowAnalyticsModal } = useAdmin();
+  const { isAdmin, showLoginModal, setShowLoginModal, logout, showAnalyticsModal, setShowAnalyticsModal } = useAdmin();
 
   // Start background global campaign stream and subscribe to real-time updates
   useEffect(() => {
@@ -319,6 +320,12 @@ function MainApp() {
 
       {/* Global Admin Login Modal */}
       <AdminLoginModal />
+
+      {/* AdSense Policy Guard: Disables Auto Ads on utility/policy/modal screens */}
+      <AdSenseGuard
+        activeTab={activeTab}
+        isModalOpen={isShareModalOpen || showLoginModal || showAnalyticsModal}
+      />
 
       {/* Floating 24/7 Multi-Language Travel Concierge Chatbot & Q&A Launcher */}
       <TravelConciergeWidget onNavigateTab={handleSetTab} />

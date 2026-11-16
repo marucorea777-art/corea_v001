@@ -3,6 +3,7 @@ import { ArrowUpRight, Award, Compass, Heart, History, Sparkles, ChevronRight, Z
 import { useState } from "react";
 import { DESTINATIONS, FESTIVALS, HERITAGE_ITEMS, HANGUL_CONCEPTS } from "../data";
 import { useTranslatedData, useTranslation, Translate } from "../context/LanguageContext";
+import EditorialArchiveSection from "./EditorialArchiveSection";
 
 import seoulSkylineHeroImg from "../assets/images/seoul_skyline_hero_1784268876066.jpg";
 import hanbokCourtImg from "../assets/images/hanbok_court_1784268718628.jpg";
@@ -417,6 +418,9 @@ export default function HomeView({ setActiveTab, onOpenShareModal }: HomeViewPro
           </div>
         </div>
       </section>
+
+      {/* In-Depth Original Editorial Archive (Google AdSense High-Value Publisher Content) */}
+      <EditorialArchiveSection setActiveTab={setActiveTab} />
 
       {/* Global Traveler Promotion & Viral Hub for corea-labs.com */}
       <section className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-stone-900 via-stone-800 to-stone-950 text-white p-8 md:p-12 border border-stone-800 shadow-xl">
