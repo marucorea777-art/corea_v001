@@ -18,6 +18,7 @@ import { FESTIVALS, PALACES, DESTINATIONS } from "../data";
 import { FESTIVAL_DETAILED_GUIDES } from "./FestivalDetailView";
 import { LANGUAGES, LanguageCode } from "../context/LanguageContext";
 import KoreaLogoIcon from "./KoreaLogoIcon";
+import { trackGA4Event } from "../services/ga4";
 
 interface ChatMessage {
   id: string;
@@ -278,6 +279,7 @@ export default function TravelConciergeWidget({ onNavigateTab }: TravelConcierge
   const handleSendQuery = async (queryText: string) => {
     const trimmed = queryText.trim();
     if (!trimmed || isTyping) return;
+    trackGA4Event("ai_concierge_ask", { language: chatLang });
 
     const userMsg: ChatMessage = {
       id: `user_${Date.now()}`,

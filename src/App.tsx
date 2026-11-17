@@ -24,6 +24,7 @@ import {
   subscribeToAnalyticsUpdates,
   startGlobalCampaignStream
 } from "./services/analytics";
+import { initGA4, trackGA4PageView } from "./services/ga4";
 import { ShieldCheck, BarChart3, LogOut, Activity } from "lucide-react";
 
 function getInitialTabFromUrl(): string {
@@ -55,8 +56,9 @@ function MainApp() {
   const { language } = useTranslation();
   const { isAdmin, showLoginModal, setShowLoginModal, logout, showAnalyticsModal, setShowAnalyticsModal } = useAdmin();
 
-  // Start background global campaign stream and subscribe to real-time updates
+  // Start background global campaign stream, initialize GA4, and subscribe to real-time updates
   useEffect(() => {
+    initGA4();
     fetchAnalyticsStats().then((s) => {
       if (s?.summary) {
         setLiveVisitorCount({ total: s.summary.totalVisits, today: s.summary.todayVisits });
@@ -74,11 +76,13 @@ function MainApp() {
     };
   }, []);
 
-  // Track page views, language selections, and dynamic SEO metadata for search engine crawlers
+  // Track page views (internal + GA4), language selections, and dynamic SEO metadata
   useEffect(() => {
     trackPageView(activeTab, language);
 
     if (typeof document !== "undefined") {
+      document.documentElement.lang = language || "en";
+
       const seoTitles: Record<string, Record<string, string>> = {
         home: {
           ko: "대한민국 연구소 | Corea Labs - 한국 여행 가이드, 문화유산 & 전국 27대 계절 축제 (11개국어)",
@@ -125,17 +129,29 @@ function MainApp() {
       };
 
       const sectionTitles = seoTitles[activeTab] || seoTitles.home;
-      document.title = sectionTitles[language] || sectionTitles.en;
+      const resolvedTitle = sectionTitles[language] || sectionTitles.en;
+      document.title = resolvedTitle;
+
+      const params = new URLSearchParams();
+      if (activeTab && activeTab !== "home") params.set("page", activeTab);
+      if (language && language !== "ko") params.set("lang", language);
+      const queryStr = params.toString();
+      const canonicalHref = `https://corea-labs.com/${queryStr ? `?${queryStr}` : ""}`;
 
       const canonicalEl = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
-      if (canonicalEl) {
-        const params = new URLSearchParams();
-        if (activeTab && activeTab !== "home") params.set("page", activeTab);
-        if (language && language !== "ko") params.set("lang", language);
-        const queryStr = params.toString();
-        canonicalEl.href = `https://corea-labs.com/${queryStr ? `?${queryStr}` : ""}`;
-      }
+      if (canonicalEl) canonicalEl.href = canonicalHref;
+
+      const ogUrl = document.querySelector('meta[property="og:url"]') as HTMLMetaElement | null;
+      if (ogUrl) ogUrl.content = canonicalHref;
+
+      const ogTitle = document.querySelector('meta[property="og:title"]') as HTMLMetaElement | null;
+      if (ogTitle) ogTitle.content = resolvedTitle;
+
+      const twTitle = document.querySelector('meta[name="twitter:title"]') as HTMLMetaElement | null;
+      if (twTitle) twTitle.content = resolvedTitle;
     }
+
+    trackGA4PageView(activeTab, language);
   }, [activeTab, language]);
 
   const handleSetTab = (tab: string) => {

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { DESTINATIONS, FESTIVALS, HERITAGE_ITEMS, HANGUL_CONCEPTS } from "../data";
 import { useTranslatedData, useTranslation, Translate } from "../context/LanguageContext";
 import EditorialArchiveSection from "./EditorialArchiveSection";
+import { trackGA4Event } from "../services/ga4";
 
 import seoulSkylineHeroImg from "../assets/images/seoul_skyline_hero_1784268876066.jpg";
 import hanbokCourtImg from "../assets/images/hanbok_court_1784268718628.jpg";
@@ -485,7 +486,8 @@ export default function HomeView({ setActiveTab, onOpenShareModal }: HomeViewPro
               </span>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText("https://corea-labs.com");
+                  navigator.clipboard.writeText(`https://corea-labs.com/?lang=${language}`);
+                  trackGA4Event("share_guide", { method: "home_copy_link", lang: language });
                   setCopiedUrl(true);
                   setTimeout(() => setCopiedUrl(false), 2500);
                 }}
@@ -503,6 +505,39 @@ export default function HomeView({ setActiveTab, onOpenShareModal }: HomeViewPro
                   </>
                 )}
               </button>
+            </div>
+
+            {/* 1-Click Viral Social Share Shortcuts for Visitors */}
+            <div className="grid grid-cols-4 gap-1.5">
+              {[
+                {
+                  name: "WhatsApp",
+                  url: `https://wa.me/?text=${encodeURIComponent(`🇰🇷 South Korea Travel & 27 Festivals Guide in 11 Languages: https://corea-labs.com/?lang=${language}&utm_source=whatsapp&utm_medium=social`)}`,
+                },
+                {
+                  name: "𝕏 Post",
+                  url: `https://twitter.com/intent/tweet?text=${encodeURIComponent("🇰🇷 Planning a trip to South Korea? 27 seasonal festivals, 5 royal palaces & KTX routes in 11 languages:")}&url=${encodeURIComponent(`https://corea-labs.com/?lang=${language}&utm_source=x_twitter&utm_medium=social`)}`,
+                },
+                {
+                  name: "Reddit",
+                  url: `https://www.reddit.com/submit?url=${encodeURIComponent(`https://corea-labs.com/?lang=${language}&utm_source=reddit&utm_medium=forum`)}&title=${encodeURIComponent("Free 11-Language South Korea Travel, Royal Palace & 27 Seasonal Festivals Guide")}`,
+                },
+                {
+                  name: "LINE",
+                  url: `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(`https://corea-labs.com/?lang=${language}&utm_source=line&utm_medium=messenger`)}`,
+                },
+              ].map((social) => (
+                <a
+                  key={social.name}
+                  href={social.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => trackGA4Event("share_guide", { method: `home_${social.name.toLowerCase()}`, lang: language })}
+                  className="py-1.5 px-2 rounded-xl bg-white/10 hover:bg-amber-400 hover:text-stone-950 text-stone-200 text-[11px] font-semibold text-center transition-colors border border-white/15"
+                >
+                  {social.name}
+                </a>
+              ))}
             </div>
 
             {/* Mobile Scan QR trigger */}

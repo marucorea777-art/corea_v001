@@ -28,6 +28,7 @@ import {
 import {
   fetchAnalyticsStats,
   getAnalyticsStatsSync,
+  getKstDateString,
   resetAnalyticsData,
   trackPageView,
   triggerGlobalSeoPingAndBoost,
@@ -35,6 +36,15 @@ import {
   AnalyticsStatsResponse,
   CountryStat
 } from "../services/analytics";
+import {
+  getGa4MeasurementIdSync,
+  getEnvGa4MeasurementId,
+  saveGA4MeasurementId,
+  trackGA4PageView,
+  trackGA4Event,
+  subscribeToGa4Status,
+  initGA4
+} from "../services/ga4";
 import { Translate, useTranslation } from "../context/LanguageContext";
 
 interface AdminAnalyticsDashboardProps {
@@ -59,6 +69,10 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
     isDestructive: boolean;
   } | null>(null);
   const [isResetting, setIsResetting] = useState<boolean>(false);
+  const [ga4Id, setGa4Id] = useState<string>(() => getGa4MeasurementIdSync());
+  const [ga4Input, setGa4Input] = useState<string>(() => getGa4MeasurementIdSync());
+  const [isSavingGa4, setIsSavingGa4] = useState<boolean>(false);
+  const isEnvGa4 = Boolean(getEnvGa4MeasurementId());
 
   const loadData = async (forceCloudSync = false) => {
     setIsRefreshing(true);
@@ -73,9 +87,20 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
   useEffect(() => {
     if (!isOpen) return;
 
-    // Immediately show latest synchronous stats in 0ms, then sync cloud in background
+    // Immediately show latest synchronous stats in 0ms, then sync cloud & GA4 status in background
     setStats(getAnalyticsStatsSync());
     loadData(true);
+    initGA4().then((resolved) => {
+      if (resolved) {
+        setGa4Id(resolved);
+        setGa4Input(resolved);
+      }
+    });
+
+    const unsubGa4 = subscribeToGa4Status((newId) => {
+      setGa4Id(newId);
+      setGa4Input(newId);
+    });
 
     // Subscribe to 0ms real-time browser ledger & cross-tab updates
     const unsubscribe = subscribeToAnalyticsUpdates((updatedStats) => {
@@ -88,6 +113,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
     }, 15000);
 
     return () => {
+      unsubGa4();
       unsubscribe();
       window.clearInterval(intervalId);
     };
@@ -96,6 +122,33 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
+  };
+
+  const handleSaveGa4 = async () => {
+    setIsSavingGa4(true);
+    const result = await saveGA4MeasurementId(ga4Input);
+    setIsSavingGa4(false);
+    if (!result.ok) {
+      showToast(result.error || "올바른 GA4 측정 ID(G-XXXXXXXXXX)를 입력해 주세요.", "error");
+      return;
+    }
+    setGa4Id(result.measurementId);
+    setGa4Input(result.measurementId);
+    if (result.measurementId) {
+      showToast(`✅ Google Analytics 4 (${result.measurementId}) 측정 ID가 사이트 전체에 실시간 연동되었습니다!`, "success");
+    } else {
+      showToast("GA4 측정 ID 연동이 해제되었습니다.", "success");
+    }
+  };
+
+  const handleTestGa4Ping = () => {
+    if (!ga4Id) {
+      showToast("먼저 G-XXXXXXXXXX 형식의 GA4 측정 ID를 입력하고 연동 저장을 눌러주세요.", "error");
+      return;
+    }
+    trackGA4PageView("home", language);
+    trackGA4Event("ga4_admin_test_ping", { source: "admin_dashboard" });
+    showToast(`📡 GA4(${ga4Id})로 실시간 page_view 및 테스트 이벤트 신호를 전송했습니다! (GA4 실시간 보고서에서 10초 내 확인 가능)`, "success");
   };
 
   const handleSimulateLiveVisit = async (sourceOverride?: string, sourceName?: string) => {
@@ -409,6 +462,72 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                   </div>
                 </div>
 
+                {/* Google Analytics 4 (GA4) Real-Time Measurement ID Connection Card */}
+                <div className="bg-white p-4 md:p-5 rounded-2xl border border-stone-200 shadow-2xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 text-xs">
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                        GOOGLE ANALYTICS 4
+                      </span>
+                      <strong className="text-sm font-bold text-stone-900">
+                        GA4 공식 실시간 측정 ID (Measurement ID) 연동
+                      </strong>
+                      {ga4Id ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-mono font-bold">
+                          <CheckCircle className="w-3 h-3" />
+                          연동 완료 ({ga4Id})
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 text-[10px] font-mono font-semibold">
+                          측정 ID 입력 대기 중
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-stone-500 leading-relaxed">
+                      Google Analytics 4 측정 ID(<code className="bg-stone-100 px-1 py-0.5 rounded font-mono text-stone-800">G-XXXXXXXXXX</code>)를 저장하면 <strong>전 세계 실제 방문자의 국가, 유입경로(구글·네이버·SNS), 체류시간, 언어별 페이지뷰</strong>가 100% 실측 데이터로 GA4에 자동 전송됩니다.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto shrink-0">
+                    <input
+                      type="text"
+                      value={ga4Input}
+                      onChange={(e) => setGa4Input(e.target.value.toUpperCase())}
+                      disabled={isEnvGa4}
+                      placeholder="G-XXXXXXXXXX 입력"
+                      className="px-3 py-2 rounded-xl border border-stone-300 bg-stone-50 focus:bg-white focus:border-amber-500 focus:outline-none font-mono text-xs text-stone-900 w-44"
+                    />
+                    {!isEnvGa4 && (
+                      <button
+                        type="button"
+                        onClick={handleSaveGa4}
+                        disabled={isSavingGa4}
+                        className="px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-amber-300 font-bold text-xs transition-colors cursor-pointer shrink-0"
+                      >
+                        {isSavingGa4 ? "저장 중..." : "측정 ID 연동 저장"}
+                      </button>
+                    )}
+                    {ga4Id && (
+                      <button
+                        type="button"
+                        onClick={handleTestGa4Ping}
+                        className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors cursor-pointer shrink-0"
+                      >
+                        실시간 신호 테스트
+                      </button>
+                    )}
+                    <a
+                      href="https://analytics.google.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 font-semibold text-xs inline-flex items-center gap-1 transition-colors shrink-0"
+                    >
+                      <span>GA4 열기</span>
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+
                 {/* 1. Summary KPI Cards */}
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
                   
@@ -437,7 +556,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                       {stats.summary.todayVisits.toLocaleString()}
                     </div>
                     <div className="text-[11px] text-stone-400 font-mono tabular-nums">
-                      {new Date().toISOString().split("T")[0]}
+                      {getKstDateString()} (KST)
                     </div>
                   </div>
 

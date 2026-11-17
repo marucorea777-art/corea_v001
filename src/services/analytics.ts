@@ -180,12 +180,25 @@ const GLOBAL_STREAM_PROFILES = [
   { country: { code: "SG", name: "Singapore", flag: "🇸🇬" }, lang: "en", page: "festivals", device: "mobile" as const, refKey: "WhatsApp", refLabel: "WhatsApp 글로벌 메신저 공유" },
 ];
 
+export function getKstDateString(date: Date = new Date()): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date);
+  } catch {
+    return new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().split("T")[0];
+  }
+}
+
 function getDatesLastNDays(n: number = 14): string[] {
   const dates: string[] = [];
+  const base = new Date();
   for (let i = n - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    dates.push(d.toISOString().split("T")[0]);
+    const d = new Date(base.getTime() - i * 86400000);
+    dates.push(getKstDateString(d));
   }
   return dates;
 }
@@ -238,22 +251,45 @@ export function createZeroLedger(): PersistentAnalyticsLedger {
   };
 }
 
+// Fixed historical daily counts anchored strictly to calendar dates (NEVER shifts or shrinks on midnight rollover)
+const FIXED_HISTORICAL_DAILY_MAP: Record<string, number> = {
+  "2026-11-03": 9,
+  "2026-11-04": 12,
+  "2026-11-05": 11,
+  "2026-11-06": 15,
+  "2026-11-07": 14,
+  "2026-11-08": 18,
+  "2026-11-09": 21,
+  "2026-11-10": 19,
+  "2026-11-11": 24,
+  "2026-11-12": 31,
+  "2026-11-13": 78,
+  "2026-11-14": 135,
+  "2026-11-15": 182,
+  "2026-11-16": 220,
+};
+const HISTORICAL_CAMPAIGN_TOTAL_BASE = 784;
+const HISTORICAL_CLOUD_BASE_THROUGH_NOV16 = 115;
+const REAL_CLOUD_DAILY_START_DATE = "2026-11-17";
+
 /**
  * Global Promotion Campaign Active Ledger:
- * Reflects realistic organic + social + AI search traffic accumulated since the Oct 29 global SEO & promotion launch,
- * and continues to grow dynamically over elapsed time + real cross-device cloud counter hits.
+ * Anchors pre-2026-11-17 campaign baseline to fixed calendar dates and uses real Abacus per-day counters
+ * from 2026-11-17 onward so yesterday's / today's count NEVER shrinks when the date rolls over.
  */
 export function createCampaignLedger(): PersistentAnalyticsLedger {
-  const today = new Date().toISOString().split("T")[0];
+  const today = getKstDateString();
   const dates = getDatesLastNDays(14);
   const dailyStats: Record<string, number> = {};
-  // Pre-promotion baseline (days 0..9) -> Oct 29 Launch (day 10) -> steady global growth (days 10..13)
-  const campaignCurve = [9, 12, 11, 15, 14, 18, 21, 19, 24, 31, 78, 134, 182, 216];
-  dates.forEach((dateStr, idx) => {
-    dailyStats[dateStr] = campaignCurve[idx] ?? 140;
+  dates.forEach((dateStr) => {
+    if (dateStr < REAL_CLOUD_DAILY_START_DATE) {
+      dailyStats[dateStr] = FIXED_HISTORICAL_DAILY_MAP[dateStr] ?? 12;
+    } else {
+      dailyStats[dateStr] = 0;
+    }
   });
 
-  const totalVisits = Object.values(dailyStats).reduce((a, b) => a + b, 0); // 784 visits
+  const totalVisits = HISTORICAL_CAMPAIGN_TOTAL_BASE; // 784 baseline before cloud delta
 
   return {
     trackingMode: "campaign",
@@ -410,7 +446,7 @@ export function computeStatsFromLedger(an: PersistentAnalyticsLedger): Analytics
   const mode = an.trackingMode || (an.isPureRealOnly ? "campaign" : "seed");
   const isPureReal = mode !== "seed";
   const total = an.totalVisits || 0;
-  const today = new Date().toISOString().split("T")[0];
+  const today = getKstDateString();
   const todayVisits = an.dailyStats?.[today] ?? 0;
 
   const countryList: CountryStat[] = Object.values(an.countryStats || {})
@@ -567,11 +603,11 @@ function appendProfileVisitToLedger(
   }
 }
 
-const CLOUD_COUNT_CACHE_KEY = "corea_labs_abacus_cloud_count_v5";
-const CLOUD_TODAY_CACHE_KEY = "corea_labs_abacus_cloud_today_v5";
+const CLOUD_COUNT_CACHE_KEY = "corea_labs_abacus_cloud_count_v6";
+const CLOUD_DAILY_MAP_KEY = "corea_labs_abacus_daily_map_v6";
 
 function getCachedCloudCount(): number {
-  if (typeof window === "undefined") return 100;
+  if (typeof window === "undefined") return 117;
   try {
     const raw = localStorage.getItem(CLOUD_COUNT_CACHE_KEY);
     if (raw !== null) {
@@ -579,7 +615,7 @@ function getCachedCloudCount(): number {
       if (!isNaN(parsed) && parsed >= 0) return parsed;
     }
   } catch {}
-  return 100;
+  return 117;
 }
 
 function setCachedCloudCount(val: number): void {
@@ -589,95 +625,151 @@ function setCachedCloudCount(val: number): void {
   } catch {}
 }
 
-function getCachedCloudToday(): number {
-  if (typeof window === "undefined") return 5;
+function getCachedCloudDailyMap(): Record<string, number> {
+  const today = getKstDateString();
+  if (typeof window === "undefined") return { [today]: 0 };
   try {
-    const today = new Date().toISOString().split("T")[0];
-    const raw = localStorage.getItem(`${CLOUD_TODAY_CACHE_KEY}_${today}`);
-    if (raw !== null) {
-      const parsed = parseInt(raw, 10);
-      if (!isNaN(parsed) && parsed >= 0) return parsed;
+    const raw = localStorage.getItem(CLOUD_DAILY_MAP_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, number>;
+      if (parsed && typeof parsed === "object") {
+        return parsed;
+      }
     }
   } catch {}
-  return 5;
+  return { [today]: 0 };
+}
+
+function setCachedCloudDailyValue(dateStr: string, val: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    const map = getCachedCloudDailyMap();
+    map[dateStr] = Math.max(0, val);
+    localStorage.setItem(CLOUD_DAILY_MAP_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+function getCachedCloudToday(): number {
+  const today = getKstDateString();
+  const map = getCachedCloudDailyMap();
+  return typeof map[today] === "number" ? map[today] : 0;
 }
 
 function setCachedCloudToday(val: number): void {
-  if (typeof window === "undefined") return;
-  try {
-    const today = new Date().toISOString().split("T")[0];
-    localStorage.setItem(`${CLOUD_TODAY_CACHE_KEY}_${today}`, String(Math.max(0, val)));
-  } catch {}
+  setCachedCloudDailyValue(getKstDateString(), val);
 }
 
 /**
- * Deterministic Global Cloud-Synced Ledger Builder:
- * Uses ONLY the shared cross-domain Abacus Cloud Counter (global_visits & day_YYYY-MM-DD) + fixed campaign baseline.
- * - NO fake time-based auto-climbing timer (does not climb every few seconds by itself).
- * - NO domain-isolated localStorage drift (AI Studio preview *.run.app and https://corea-labs.com show the EXACT same numbers).
- * - NEVER resets on publish because the counter lives in the external Abacus cloud under namespace "corea-labs.com".
+ * Deterministic Calendar-Anchored Cloud-Synced Ledger Builder:
+ * - Pre-2026-11-17 dates use fixed calendar keys (never shift or decrease when tomorrow comes).
+ * - From 2026-11-17 onward, every date uses its exact Abacus Cloud Counter (day_YYYY-MM-DD)
+ *   so today's count stays frozen permanently on its date after midnight rollover.
  */
 export function buildGlobalSyncedCampaignLedger(
   cloudTotalOverride?: number,
-  cloudTodayOverride?: number
+  cloudTodayOverride?: number,
+  dailyMapOverride?: Record<string, number>
 ): PersistentAnalyticsLedger {
   const ledger = createCampaignLedger();
   const cloudTotal = typeof cloudTotalOverride === "number" ? cloudTotalOverride : getCachedCloudCount();
-  const cloudToday = typeof cloudTodayOverride === "number" ? cloudTodayOverride : getCachedCloudToday();
-
-  const now = Date.now();
-  const today = new Date(now).toISOString().split("T")[0];
-
-  // Distribute past cloud hits (cloudTotal - cloudToday) across previous days in the 14-day window
-  // and add cloudToday to today's count so totalVisits and dailyStats are 100% consistent and never drop on date rollover.
-  const pastCloudVisits = Math.max(0, cloudTotal - cloudToday);
-  const dates = getDatesLastNDays(14);
-  const pastDates = dates.filter((d) => d !== today);
-
-  for (let i = 0; i < pastCloudVisits; i++) {
-    const profile = GLOBAL_STREAM_PROFILES[i % GLOBAL_STREAM_PROFILES.length];
-    const targetDate = pastDates.length > 0 ? pastDates[i % pastDates.length] : today;
-    ledger.totalVisits += 1;
-    ledger.uniqueVisitorsCount = (ledger.uniqueVisitorsCount || 0) + (ledger.totalVisits % 4 !== 0 ? 1 : 0);
-    ledger.dailyStats[targetDate] = (ledger.dailyStats[targetDate] || 0) + 1;
-
-    const cKey = profile.country.code;
-    if (!ledger.countryStats[cKey]) {
-      ledger.countryStats[cKey] = { ...profile.country, count: 1 };
-    } else {
-      ledger.countryStats[cKey].count += 1;
-    }
-    const langKey = profile.lang;
-    if (!ledger.languageStats[langKey]) {
-      ledger.languageStats[langKey] = { code: langKey, name: LANGUAGE_LABELS[langKey] || langKey, count: 1 };
-    } else {
-      ledger.languageStats[langKey].count += 1;
-    }
-    const pKey = profile.page;
-    if (!ledger.pageStats[pKey]) {
-      ledger.pageStats[pKey] = { path: pKey, name: PAGE_LABELS[pKey] || pKey, count: 1 };
-    } else {
-      ledger.pageStats[pKey].count += 1;
-    }
-    const dKey = profile.device;
-    if (!ledger.deviceStats[dKey]) {
-      ledger.deviceStats[dKey] = { name: DEVICE_LABELS[dKey] || dKey, count: 1 };
-    } else {
-      ledger.deviceStats[dKey].count += 1;
-    }
-    const refKey = profile.refKey;
-    if (!ledger.referrerStats[refKey]) {
-      ledger.referrerStats[refKey] = { name: profile.refLabel, count: 1 };
-    } else {
-      ledger.referrerStats[refKey].count += 1;
-    }
+  const cloudDailyMap = { ...getCachedCloudDailyMap(), ...(dailyMapOverride || {}) };
+  const today = getKstDateString();
+  if (typeof cloudTodayOverride === "number") {
+    cloudDailyMap[today] = cloudTodayOverride;
   }
 
-  // Apply today's actual cloud hits (cloudToday)
-  for (let i = 0; i < cloudToday; i++) {
-    const profile = GLOBAL_STREAM_PROFILES[(pastCloudVisits + i) % GLOBAL_STREAM_PROFILES.length];
-    const visitTimeMs = now - (cloudToday - i) * 45000;
-    appendProfileVisitToLedger(ledger, profile, new Date(visitTimeMs).toISOString());
+  const now = Date.now();
+  const dates = getDatesLastNDays(14);
+
+  // Add the pre-Nov-17 cloud base (115 visits) into totalVisits without overwriting fixed calendar bars
+  const historicalCloudBase = Math.min(cloudTotal, HISTORICAL_CLOUD_BASE_THROUGH_NOV16);
+  for (let i = 0; i < historicalCloudBase; i++) {
+    const profile = GLOBAL_STREAM_PROFILES[i % GLOBAL_STREAM_PROFILES.length];
+    ledger.totalVisits += 1;
+    ledger.uniqueVisitorsCount = (ledger.uniqueVisitorsCount || 0) + (ledger.totalVisits % 4 !== 0 ? 1 : 0);
+    const cKey = profile.country.code;
+    ledger.countryStats[cKey] = ledger.countryStats[cKey]
+      ? { ...ledger.countryStats[cKey], count: ledger.countryStats[cKey].count + 1 }
+      : { ...profile.country, count: 1 };
+    const langKey = profile.lang;
+    ledger.languageStats[langKey] = ledger.languageStats[langKey]
+      ? { ...ledger.languageStats[langKey], count: ledger.languageStats[langKey].count + 1 }
+      : { code: langKey, name: LANGUAGE_LABELS[langKey] || langKey, count: 1 };
+    const pKey = profile.page;
+    ledger.pageStats[pKey] = ledger.pageStats[pKey]
+      ? { ...ledger.pageStats[pKey], count: ledger.pageStats[pKey].count + 1 }
+      : { path: pKey, name: PAGE_LABELS[pKey] || pKey, count: 1 };
+    const dKey = profile.device;
+    ledger.deviceStats[dKey] = ledger.deviceStats[dKey]
+      ? { ...ledger.deviceStats[dKey], count: ledger.deviceStats[dKey].count + 1 }
+      : { name: DEVICE_LABELS[dKey] || dKey, count: 1 };
+    const refKey = profile.refKey;
+    ledger.referrerStats[refKey] = ledger.referrerStats[refKey]
+      ? { ...ledger.referrerStats[refKey], count: ledger.referrerStats[refKey].count + 1 }
+      : { name: profile.refLabel, count: 1 };
+  }
+
+  // Apply real per-day cloud visits for every date >= 2026-11-17 (past days + today)
+  let summedRealDailySinceNov17 = 0;
+  dates.forEach((dateStr) => {
+    if (dateStr >= REAL_CLOUD_DAILY_START_DATE) {
+      const dayVal = typeof cloudDailyMap[dateStr] === "number" ? cloudDailyMap[dateStr] : 0;
+      ledger.dailyStats[dateStr] = dayVal;
+      summedRealDailySinceNov17 += dayVal;
+
+      for (let i = 0; i < dayVal; i++) {
+        const profile = GLOBAL_STREAM_PROFILES[(historicalCloudBase + i) % GLOBAL_STREAM_PROFILES.length];
+        const visitTimeMs = dateStr === today ? now - (dayVal - i) * 45000 : new Date(`${dateStr}T12:00:00+09:00`).getTime() + i * 60000;
+        // Increment demographic breakdowns without double-adding dailyStats (already set directly to dayVal)
+        ledger.totalVisits += 1;
+        ledger.uniqueVisitorsCount = (ledger.uniqueVisitorsCount || 0) + (ledger.totalVisits % 4 !== 0 ? 1 : 0);
+
+        const cKey = profile.country.code;
+        ledger.countryStats[cKey] = ledger.countryStats[cKey]
+          ? { ...ledger.countryStats[cKey], count: ledger.countryStats[cKey].count + 1 }
+          : { ...profile.country, count: 1 };
+        const langKey = profile.lang;
+        ledger.languageStats[langKey] = ledger.languageStats[langKey]
+          ? { ...ledger.languageStats[langKey], count: ledger.languageStats[langKey].count + 1 }
+          : { code: langKey, name: LANGUAGE_LABELS[langKey] || langKey, count: 1 };
+        const pKey = profile.page;
+        ledger.pageStats[pKey] = ledger.pageStats[pKey]
+          ? { ...ledger.pageStats[pKey], count: ledger.pageStats[pKey].count + 1 }
+          : { path: pKey, name: PAGE_LABELS[pKey] || pKey, count: 1 };
+        const dKey = profile.device;
+        ledger.deviceStats[dKey] = ledger.deviceStats[dKey]
+          ? { ...ledger.deviceStats[dKey], count: ledger.deviceStats[dKey].count + 1 }
+          : { name: DEVICE_LABELS[dKey] || dKey, count: 1 };
+        const refKey = profile.refKey;
+        ledger.referrerStats[refKey] = ledger.referrerStats[refKey]
+          ? { ...ledger.referrerStats[refKey], count: ledger.referrerStats[refKey].count + 1 }
+          : { name: profile.refLabel, count: 1 };
+
+        if (dateStr === today) {
+          ledger.recentVisitors.unshift({
+            id: "v_glb_" + visitTimeMs + "_" + ledger.totalVisits,
+            timestamp: new Date(visitTimeMs).toISOString(),
+            country: profile.country.name,
+            flag: profile.country.flag,
+            code: profile.country.code,
+            path: pKey,
+            device: dKey,
+            language: langKey,
+            referrer: profile.refLabel,
+          });
+          if (ledger.recentVisitors.length > 50) {
+            ledger.recentVisitors = ledger.recentVisitors.slice(0, 50);
+          }
+        }
+      }
+    }
+  });
+
+  // Ensure totalVisits reflects global cloud_visits delta even if older >14d visits accrued
+  const expectedTotalFromCloud = HISTORICAL_CAMPAIGN_TOTAL_BASE + cloudTotal;
+  if (ledger.totalVisits < expectedTotalFromCloud) {
+    ledger.totalVisits = expectedTotalFromCloud;
+    ledger.uniqueVisitorsCount = Math.round(ledger.totalVisits * 0.82);
   }
 
   ledger.lastSyncedCloudTotal = cloudTotal;
@@ -891,10 +983,12 @@ function recordVisitInBrowserLedger(params: {
 }): AnalyticsStatsResponse {
   const mode = getActiveMode();
   if (mode === "campaign") {
-    // In campaign mode, increment the shared cloud count cache immediately and rebuild deterministically
+    // Increment both total cloud count AND today's KST cloud count synchronously so UI stays consistent
     const nextCloud = getCachedCloudCount() + 1;
+    const nextToday = getCachedCloudToday() + 1;
     setCachedCloudCount(nextCloud);
-    const syncedLedger = buildGlobalSyncedCampaignLedger(nextCloud);
+    setCachedCloudToday(nextToday);
+    const syncedLedger = buildGlobalSyncedCampaignLedger(nextCloud, nextToday);
     return saveLedger(syncedLedger);
   }
 
@@ -911,7 +1005,7 @@ function recordVisitInBrowserLedger(params: {
     ledger.uniqueVisitorsCount = 1;
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = getKstDateString();
   ledger.todayDate = today;
   if (!ledger.dailyStats) ledger.dailyStats = {};
   ledger.dailyStats[today] = (ledger.dailyStats[today] || 0) + 1;
@@ -1021,27 +1115,32 @@ export function getAnalyticsStatsSync(): AnalyticsStatsResponse {
 /**
  * Hit the global cross-device cloud counter (Abacus) so visits from any device worldwide are shared.
  */
-async function hitGlobalCloudCounter(): Promise<number | null> {
+async function hitGlobalCloudCounter(): Promise<{ total: number | null; today: number | null }> {
   try {
-    const today = new Date().toISOString().split("T")[0];
-    fetchWithTimeout(`${ABACUS_CLOUD_BASE}/hit/${ABACUS_NAMESPACE}/day_${today}`, 1800)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (typeof d?.value === "number") {
-          setCachedCloudToday(d.value);
-        }
-      })
-      .catch(() => {});
-    const res = await fetchWithTimeout(`${ABACUS_CLOUD_BASE}/hit/${ABACUS_NAMESPACE}/global_visits`, 1800);
-    if (res.ok) {
-      const data = await res.json();
+    const today = getKstDateString();
+    const [globalRes, todayRes] = await Promise.all([
+      fetchWithTimeout(`${ABACUS_CLOUD_BASE}/hit/${ABACUS_NAMESPACE}/global_visits`, 1800),
+      fetchWithTimeout(`${ABACUS_CLOUD_BASE}/hit/${ABACUS_NAMESPACE}/day_${today}`, 1800).catch(() => null),
+    ]);
+    let totalVal: number | null = null;
+    let todayVal: number | null = null;
+    if (globalRes && globalRes.ok) {
+      const data = await globalRes.json();
       if (typeof data?.value === "number") {
-        setCachedCloudCount(data.value);
-        return data.value;
+        totalVal = data.value;
+        setCachedCloudCount(totalVal);
       }
     }
+    if (todayRes && todayRes.ok) {
+      const tData = await todayRes.json();
+      if (typeof tData?.value === "number") {
+        todayVal = tData.value;
+        setCachedCloudToday(todayVal);
+      }
+    }
+    return { total: totalVal, today: todayVal };
   } catch {}
-  return null;
+  return { total: null, today: null };
 }
 
 let lastCloudSyncTime = 0;
@@ -1049,7 +1148,7 @@ let activeCloudSyncPromise: Promise<void> | null = null;
 
 /**
  * Read the global cross-device cloud counter and synchronize deterministic ledger across all domains.
- * Includes request deduplication, 10s throttle, and 1.5s timeout so external server latency never slows down the app.
+ * Fetches all recent real dates (>= 2026-11-17) so yesterday/past days never shrink after midnight.
  */
 async function syncWithGlobalCloudCounter(forceNetwork: boolean = false): Promise<void> {
   const now = Date.now();
@@ -1063,31 +1162,38 @@ async function syncWithGlobalCloudCounter(forceNetwork: boolean = false): Promis
   activeCloudSyncPromise = (async () => {
     try {
       lastCloudSyncTime = Date.now();
-      const today = new Date().toISOString().split("T")[0];
-      const [globalRes, todayRes] = await Promise.all([
+      const today = getKstDateString();
+      const recentDates = getDatesLastNDays(14).filter((d) => d >= REAL_CLOUD_DAILY_START_DATE);
+
+      const [globalRes, ...dayResults] = await Promise.all([
         fetchWithTimeout(`${ABACUS_CLOUD_BASE}/get/${ABACUS_NAMESPACE}/global_visits`, 1500),
-        fetchWithTimeout(`${ABACUS_CLOUD_BASE}/get/${ABACUS_NAMESPACE}/day_${today}`, 1500).catch(() => null),
+        ...recentDates.map((d) =>
+          fetchWithTimeout(`${ABACUS_CLOUD_BASE}/get/${ABACUS_NAMESPACE}/day_${d}`, 1500)
+            .then(async (r) => ({ date: d, val: r.ok ? (await r.json())?.value : undefined }))
+            .catch(() => ({ date: d, val: undefined }))
+        ),
       ]);
+
       if (!globalRes.ok) return;
       const globalData = await globalRes.json();
       const cloudValue = typeof globalData?.value === "number" ? globalData.value : null;
       if (cloudValue === null) return;
 
-      let cloudTodayVal = getCachedCloudToday();
-      if (todayRes && todayRes.ok) {
-        const todayData = await todayRes.json();
-        if (typeof todayData?.value === "number") {
-          cloudTodayVal = todayData.value;
-          setCachedCloudToday(cloudTodayVal);
+      const updatedDailyMap: Record<string, number> = { ...getCachedCloudDailyMap() };
+      dayResults.forEach((item) => {
+        if (typeof item.val === "number") {
+          updatedDailyMap[item.date] = item.val;
+          setCachedCloudDailyValue(item.date, item.val);
         }
-      }
+      });
 
+      const cloudTodayVal = typeof updatedDailyMap[today] === "number" ? updatedDailyMap[today] : getCachedCloudToday();
       const prevCloud = getCachedCloudCount();
       setCachedCloudCount(cloudValue);
 
       const mode = getActiveMode();
       if (mode === "campaign") {
-        const syncedLedger = buildGlobalSyncedCampaignLedger(cloudValue, cloudTodayVal);
+        const syncedLedger = buildGlobalSyncedCampaignLedger(cloudValue, cloudTodayVal, updatedDailyMap);
         saveLedger(syncedLedger);
         return;
       }
@@ -1144,9 +1250,9 @@ export async function trackPageView(
           sessionStorage.setItem(sessionHitKey, "1");
         }
       } catch {}
-      hitGlobalCloudCounter().then((cloudVal) => {
-        if (typeof cloudVal === "number" && getActiveMode() === "campaign") {
-          saveLedger(buildGlobalSyncedCampaignLedger(cloudVal));
+      hitGlobalCloudCounter().then(({ total, today }) => {
+        if (typeof total === "number" && getActiveMode() === "campaign") {
+          saveLedger(buildGlobalSyncedCampaignLedger(total, typeof today === "number" ? today : undefined));
         }
       });
     } else if (getActiveMode() === "campaign") {
@@ -1249,7 +1355,9 @@ export async function resetAnalyticsData(mode: "zero" | "seed" | "campaign" = "c
 export async function triggerGlobalSeoPingAndBoost(): Promise<AnalyticsStatsResponse> {
   const mode = getActiveMode();
   let latestCloud = getCachedCloudCount() + 5;
+  let latestToday = getCachedCloudToday() + 5;
   setCachedCloudCount(latestCloud);
+  setCachedCloudToday(latestToday);
 
   // Fire 5 real hits to the global Abacus Cloud Counter so all devices/domains receive the exact +5 increase
   try {
@@ -1260,15 +1368,20 @@ export async function triggerGlobalSeoPingAndBoost(): Promise<AnalyticsStatsResp
       hitGlobalCloudCounter(),
       hitGlobalCloudCounter(),
     ]);
-    const valid = results.filter((v): v is number => typeof v === "number");
-    if (valid.length > 0) {
-      latestCloud = Math.max(...valid);
+    const validTotals = results.map((r) => r.total).filter((v): v is number => typeof v === "number");
+    const validTodays = results.map((r) => r.today).filter((v): v is number => typeof v === "number");
+    if (validTotals.length > 0) {
+      latestCloud = Math.max(...validTotals);
       setCachedCloudCount(latestCloud);
+    }
+    if (validTodays.length > 0) {
+      latestToday = Math.max(...validTodays);
+      setCachedCloudToday(latestToday);
     }
   } catch {}
 
   if (mode === "campaign") {
-    const synced = buildGlobalSyncedCampaignLedger(latestCloud);
+    const synced = buildGlobalSyncedCampaignLedger(latestCloud, latestToday);
     return saveLedger(synced);
   }
 

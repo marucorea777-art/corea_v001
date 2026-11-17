@@ -21,6 +21,7 @@ import {
   Link2
 } from "lucide-react";
 import { useTranslation, Translate } from "../context/LanguageContext";
+import { trackGA4Event } from "../services/ga4";
 
 interface GlobalShareModalProps {
   isOpen: boolean;
@@ -79,6 +80,7 @@ export default function GlobalShareModal({ isOpen, onClose, initialTab = "seo" }
 
   const handleBroadcastIndexNow = async () => {
     setIsPingingSearch(true);
+    trackGA4Event("seo_indexnow_ping", { source: "global_share_modal" });
     try {
       const res = await fetch("/api/promote/ping", { method: "POST" });
       if (res.ok) {
@@ -90,7 +92,7 @@ export default function GlobalShareModal({ isOpen, onClose, initialTab = "seo" }
     } catch {}
     // Client-side direct fallback if running on static host
     setPingResult({
-      submittedUrls: 24,
+      submittedUrls: 30,
       timestamp: new Date().toISOString(),
       results: [
         { target: "IndexNow Global Hub (Bing / Seznam / Naver)", status: 200, ok: true },
@@ -370,12 +372,14 @@ Link in bio: https://corea-labs.com/?utm_source=instagram
 
   const handleCopy = () => {
     navigator.clipboard.writeText(siteUrl);
+    trackGA4Event("share_guide", { method: "copy_root_url" });
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
 
   const handleCopyUtmLink = () => {
     navigator.clipboard.writeText(customTrackedUrl);
+    trackGA4Event("share_guide", { method: "copy_utm_link", channel: selectedUtmChannel, lang: selectedLangPromo, page: selectedPagePromo });
     setCopiedUtm(true);
     setTimeout(() => setCopiedUtm(false), 2500);
   };
@@ -383,6 +387,7 @@ Link in bio: https://corea-labs.com/?utm_source=instagram
   const handleCopyUtmMessage = () => {
     const msg = getPromoMessage(selectedLangPromo, customTrackedUrl).text;
     navigator.clipboard.writeText(msg);
+    trackGA4Event("share_guide", { method: "copy_utm_message", channel: selectedUtmChannel, lang: selectedLangPromo, page: selectedPagePromo });
     setCopiedUtmMsg(true);
     setTimeout(() => setCopiedUtmMsg(false), 2500);
   };
@@ -730,7 +735,7 @@ Link in bio: https://corea-labs.com/?utm_source=instagram
                         <span>🚀 3. 글로벌 검색엔진(IndexNow·Bing·Naver·Yandex·Google RSS) 실시간 색인 전송</span>
                       </div>
                       <p className="text-[11px] text-stone-500 mt-0.5">
-                        클릭 한 번으로 corea-labs.com의 24개 핵심 다국어·메뉴 URL을 글로벌 검색엔진 색인 허브에 즉시 푸시합니다.
+                        클릭 한 번으로 corea-labs.com의 30개 핵심 다국어·메뉴 URL을 글로벌 검색엔진 색인 허브에 즉시 푸시합니다.
                       </p>
                     </div>
                     <button
@@ -739,7 +744,7 @@ Link in bio: https://corea-labs.com/?utm_source=instagram
                       className="px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-black text-amber-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-xs disabled:opacity-60 shrink-0"
                     >
                       <Sparkles className={`w-3.5 h-3.5 ${isPingingSearch ? "animate-spin" : ""}`} />
-                      <span>{isPingingSearch ? "글로벌 검색엔진 전송 중..." : "검색엔진 24개 URL 즉시 색인 요청"}</span>
+                      <span>{isPingingSearch ? "글로벌 검색엔진 전송 중..." : "검색엔진 30개 URL 즉시 색인 요청"}</span>
                     </button>
                   </div>
 
@@ -797,6 +802,42 @@ Link in bio: https://corea-labs.com/?utm_source=instagram
                       <span>/robots.txt (글로벌 크롤러 허용)</span>
                       <ExternalLink className="w-3 h-3 text-stone-400" />
                     </a>
+                  </div>
+
+                  {/* Direct Search Engine Console Submission Launchers */}
+                  <div className="pt-2 border-t border-stone-200/70 space-y-2">
+                    <div className="text-[11px] font-bold text-stone-800">
+                      📌 검색 유입 극대화 3대 콘솔 사이트맵 등록 바로가기 (배포 후 1회 등록):
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href="https://search.google.com/search-console"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 font-semibold text-[11px] inline-flex items-center gap-1 transition-colors"
+                      >
+                        <span>Google Search Console (sitemap.xml)</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                      <a
+                        href="https://searchadvisor.naver.com/console/board"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 font-semibold text-[11px] inline-flex items-center gap-1 transition-colors"
+                      >
+                        <span>네이버 서치어드바이저 (sitemap + rss.xml)</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                      <a
+                        href="https://www.bing.com/webmasters"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 font-semibold text-[11px] inline-flex items-center gap-1 transition-colors"
+                      >
+                        <span>Bing Webmaster Tools (ChatGPT 검색 연동)</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -4,7 +4,7 @@
   <!-- 1. Home & Editorial Research Archive -->
   <url>
     <loc>https://corea-labs.com/</loc>
-    <lastmod>2026-11-16</lastmod>
+    <lastmod>2026-11-17</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://corea-labs.com/" />
@@ -24,20 +24,27 @@
   <!-- 2. 27 Nationwide Seasonal Festivals & KTX Transit Guide -->
   <url>
     <loc>https://corea-labs.com/?page=festivals</loc>
-    <lastmod>2026-11-16</lastmod>
-    <changefreq>weekly</changefreq>
+    <lastmod>2026-11-17</lastmod>
+    <changefreq>daily</changefreq>
     <priority>0.95</priority>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://corea-labs.com/?page=festivals" />
     <xhtml:link rel="alternate" hreflang="ko" href="https://corea-labs.com/?page=festivals&amp;lang=ko" />
     <xhtml:link rel="alternate" hreflang="en" href="https://corea-labs.com/?page=festivals&amp;lang=en" />
     <xhtml:link rel="alternate" hreflang="ja" href="https://corea-labs.com/?page=festivals&amp;lang=ja" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://corea-labs.com/?page=festivals&amp;lang=zh" />
+    <xhtml:link rel="alternate" hreflang="th" href="https://corea-labs.com/?page=festivals&amp;lang=th" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://corea-labs.com/?page=festivals&amp;lang=fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://corea-labs.com/?page=festivals&amp;lang=es" />
+    <xhtml:link rel="alternate" hreflang="pt" href="https://corea-labs.com/?page=festivals&amp;lang=pt" />
+    <xhtml:link rel="alternate" hreflang="ru" href="https://corea-labs.com/?page=festivals&amp;lang=ru" />
+    <xhtml:link rel="alternate" hreflang="uk" href="https://corea-labs.com/?page=festivals&amp;lang=uk" />
+    <xhtml:link rel="alternate" hreflang="ka" href="https://corea-labs.com/?page=festivals&amp;lang=ka" />
   </url>
 
   <!-- 3. 5 Grand Joseon Royal Palaces & UNESCO World Heritage -->
   <url>
     <loc>https://corea-labs.com/?page=heritage</loc>
-    <lastmod>2026-11-16</lastmod>
+    <lastmod>2026-11-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.95</priority>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://corea-labs.com/?page=heritage" />
@@ -45,25 +52,31 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://corea-labs.com/?page=heritage&amp;lang=en" />
     <xhtml:link rel="alternate" hreflang="ja" href="https://corea-labs.com/?page=heritage&amp;lang=ja" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://corea-labs.com/?page=heritage&amp;lang=zh" />
+    <xhtml:link rel="alternate" hreflang="th" href="https://corea-labs.com/?page=heritage&amp;lang=th" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://corea-labs.com/?page=heritage&amp;lang=fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://corea-labs.com/?page=heritage&amp;lang=es" />
   </url>
 
   <!-- 4. Foreign Traveler Essential Korea Manual (K-ETA, WOWPASS, T-Money, 1330) -->
   <url>
     <loc>https://corea-labs.com/?page=travel</loc>
-    <lastmod>2026-11-16</lastmod>
+    <lastmod>2026-11-17</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.90</priority>
+    <priority>0.95</priority>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://corea-labs.com/?page=travel" />
     <xhtml:link rel="alternate" hreflang="ko" href="https://corea-labs.com/?page=travel&amp;lang=ko" />
     <xhtml:link rel="alternate" hreflang="en" href="https://corea-labs.com/?page=travel&amp;lang=en" />
     <xhtml:link rel="alternate" hreflang="ja" href="https://corea-labs.com/?page=travel&amp;lang=ja" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://corea-labs.com/?page=travel&amp;lang=zh" />
+    <xhtml:link rel="alternate" hreflang="th" href="https://corea-labs.com/?page=travel&amp;lang=th" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://corea-labs.com/?page=travel&amp;lang=fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://corea-labs.com/?page=travel&amp;lang=es" />
   </url>
 
   <!-- 5. Curated Regional Places & Cities -->
   <url>
     <loc>https://corea-labs.com/?page=places</loc>
-    <lastmod>2026-11-16</lastmod>
+    <lastmod>2026-11-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://corea-labs.com/?page=places" />
@@ -71,12 +84,15 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://corea-labs.com/?page=places&amp;lang=en" />
     <xhtml:link rel="alternate" hreflang="ja" href="https://corea-labs.com/?page=places&amp;lang=ja" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://corea-labs.com/?page=places&amp;lang=zh" />
+    <xhtml:link rel="alternate" hreflang="th" href="https://corea-labs.com/?page=places&amp;lang=th" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://corea-labs.com/?page=places&amp;lang=fr" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://corea-labs.com/?page=places&amp;lang=es" />
   </url>
 
   <!-- 6. Traditional Korean Culture Archive -->
   <url>
     <loc>https://corea-labs.com/?page=culture</loc>
-    <lastmod>2026-11-16</lastmod>
+    <lastmod>2026-11-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://corea-labs.com/?page=culture" />
@@ -85,4 +101,25 @@
     <xhtml:link rel="alternate" hreflang="ja" href="https://corea-labs.com/?page=culture&amp;lang=ja" />
     <xhtml:link rel="alternate" hreflang="zh" href="https://corea-labs.com/?page=culture&amp;lang=zh" />
   </url>
+
+  <!-- 7. Global Korea Traveler Q&A Board -->
+  <url>
+    <loc>https://corea-labs.com/?page=qna</loc>
+    <lastmod>2026-11-17</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.90</priority>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://corea-labs.com/?page=qna" />
+    <xhtml:link rel="alternate" hreflang="ko" href="https://corea-labs.com/?page=qna&amp;lang=ko" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://corea-labs.com/?page=qna&amp;lang=en" />
+    <xhtml:link rel="alternate" hreflang="ja" href="https://corea-labs.com/?page=qna&amp;lang=ja" />
+    <xhtml:link rel="alternate" hreflang="zh" href="https://corea-labs.com/?page=qna&amp;lang=zh" />
+  </url>
+
+  <!-- 8. Multilingual Language Entry Landing Pages -->
+  <url><loc>https://corea-labs.com/?lang=en</loc><lastmod>2026-11-17</lastmod><changefreq>daily</changefreq><priority>0.95</priority></url>
+  <url><loc>https://corea-labs.com/?lang=ja</loc><lastmod>2026-11-17</lastmod><changefreq>daily</changefreq><priority>0.90</priority></url>
+  <url><loc>https://corea-labs.com/?lang=zh</loc><lastmod>2026-11-17</lastmod><changefreq>daily</changefreq><priority>0.90</priority></url>
+  <url><loc>https://corea-labs.com/?lang=es</loc><lastmod>2026-11-17</lastmod><changefreq>weekly</changefreq><priority>0.85</priority></url>
+  <url><loc>https://corea-labs.com/?lang=fr</loc><lastmod>2026-11-17</lastmod><changefreq>weekly</changefreq><priority>0.85</priority></url>
+  <url><loc>https://corea-labs.com/?lang=th</loc><lastmod>2026-11-17</lastmod><changefreq>weekly</changefreq><priority>0.85</priority></url>
 </urlset>

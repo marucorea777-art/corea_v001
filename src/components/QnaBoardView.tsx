@@ -25,6 +25,7 @@ import {
 } from "../services/dataStorage";
 import { Translate, useTranslation } from "../context/LanguageContext";
 import { useAdmin } from "../context/AdminContext";
+import { trackGA4Event } from "../services/ga4";
 
 const CATEGORY_OPTIONS = [
   { id: "all", label: "전체 질문", badgeClass: "bg-stone-900 text-white" },
@@ -92,6 +93,7 @@ export default function QnaBoardView() {
     setIsWriteModalOpen(false);
     setNewTitle("");
     setNewContent("");
+    trackGA4Event("qna_post_create", { category: newCategory });
     showToast(t("질문이 성공적으로 등록되었습니다!"));
   };
 
