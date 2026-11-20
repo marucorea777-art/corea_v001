@@ -16,25 +16,21 @@ import {
   ArrowUpRight,
   ShieldCheck,
   CheckCircle,
-  Eye,
   Activity,
-  Info,
   RotateCcw,
   Database,
   Trash2,
-  AlertTriangle,
-  PlusCircle
+  AlertTriangle
 } from "lucide-react";
 import {
   fetchAnalyticsStats,
   getAnalyticsStatsSync,
   getKstDateString,
   resetAnalyticsData,
-  trackPageView,
   triggerGlobalSeoPingAndBoost,
   subscribeToAnalyticsUpdates,
   AnalyticsStatsResponse,
-  CountryStat
+  formatDurationSeconds
 } from "../services/analytics";
 import {
   getGa4MeasurementIdSync,
@@ -62,7 +58,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
-    mode: "zero" | "seed" | "campaign";
+    mode: "real" | "zero" | "seed";
     title: string;
     description: string;
     actionText: string;
@@ -151,41 +147,30 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
     showToast(`📡 GA4(${ga4Id})로 실시간 page_view 및 테스트 이벤트 신호를 전송했습니다! (GA4 실시간 보고서에서 10초 내 확인 가능)`, "success");
   };
 
-  const handleSimulateLiveVisit = async (sourceOverride?: string, sourceName?: string) => {
-    await trackPageView("home", language, true, sourceOverride);
-    await loadData(false);
-    showToast(
-      sourceName
-        ? `✅ [${sourceName}] 유입 경로로 실시간 방문자 +1 카운트가 즉시 반영되었습니다!`
-        : "✅ 실시간 방문자 +1 카운트가 즉시 반영되었습니다! (오늘 방문자·유입 경로·최근 접속 로그 확인)",
-      "success"
-    );
-  };
-
   const handleSeoPingBoost = async () => {
     setIsRefreshing(true);
     await triggerGlobalSeoPingAndBoost();
-    await loadData(false);
+    await loadData(true);
     setIsRefreshing(false);
     showToast(
-      "🚀 글로벌 검색엔진(Google·Bing·ChatGPT·Reddit·샤오홍슈) 색인 Ping 발송 및 해외 5개국 실시간 유입(+5)이 반영되었습니다!",
+      "📡 글로벌 검색엔진(IndexNow·Bing·Naver·WebSub) 색인 Ping 발송 및 클라우드 실측 통계를 최신화했습니다.",
       "success"
     );
   };
 
-  const executeReset = async (mode: "zero" | "seed" | "campaign") => {
+  const executeReset = async (mode: "real" | "zero" | "seed") => {
     setIsResetting(true);
     const ok = await resetAnalyticsData(mode);
     setIsResetting(false);
     setConfirmModal(null);
     if (ok) {
-      await loadData(false);
+      await loadData(true);
       showToast(
         mode === "zero"
-          ? "✅ 초기화 완료! 현재 접속 세션을 포함해 1명부터 순수 수동 집계를 시작합니다."
-          : mode === "campaign"
-          ? "🚀 글로벌 홍보 캠페인 실시간 유입 모드(Abacus 클라우드 연동 + 해외 검색·SNS 실시간 유입 스트림)가 가동되었습니다!"
-          : "✅ 통계 데이터가 대규모 시연 기준치(14,821명)로 복원되었습니다.",
+          ? "✅ 초기화 완료! 로컬 로그를 비우고 현재 접속 세션(1명)부터 순수 집계를 시작합니다."
+          : mode === "real"
+          ? "📡 100% 실측 모드(Abacus 클라우드 누적 + 실시간 세션·체류시간)로 전환되었습니다!"
+          : "📊 시연용 데모 데이터 미리보기 모드로 전환되었습니다 (실제 방문자 수치 아님).",
         "success"
       );
     } else {
@@ -252,7 +237,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
     ? `${svgLinePath} L ${chartPoints[chartPoints.length - 1].x} ${svgHeight - 10} L ${chartPoints[0].x} ${svgHeight - 10} Z`
     : "";
 
-  const trackingMode = stats?.summary?.trackingMode || (stats?.summary?.isPureRealOnly ? "campaign" : "seed");
+  const trackingMode = stats?.summary?.trackingMode || (stats?.summary?.isPureRealOnly ? "real" : "seed");
   const isPureRealOnly = trackingMode !== "seed";
 
   return (
@@ -275,13 +260,17 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                   <h3 className="font-display font-bold text-lg md:text-xl text-white">
                     <Translate>방문자 및 국가별 통계 분석 대시보드</Translate>
                   </h3>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/30">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    GLOBAL CLOUD + LIVE STREAM
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                    trackingMode === "seed"
+                      ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                      : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${trackingMode === "seed" ? "bg-amber-400" : "bg-emerald-400"}`} />
+                    {trackingMode === "seed" ? "DEMO PREVIEW DATA" : "100% REAL CLOUD + SESSION"}
                   </span>
                 </div>
                 <p className="text-xs text-stone-300 font-sans mt-0.5">
-                  <Translate>corea-labs.com 전 세계 기기 통합 클라우드 카운터 및 해외 캠페인 실시간 유입 모니터링</Translate>
+                  <Translate>corea-labs.com 전 세계 클라우드 카운터(Abacus) 및 실제 세션 체류시간 모니터링</Translate>
                 </p>
               </div>
             </div>
@@ -292,10 +281,10 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                 onClick={handleSeoPingBoost}
                 disabled={isRefreshing}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
-                title="Google·Bing·ChatGPT·Reddit 등 해외 검색/커뮤니티 색인 Ping 발송 및 즉시 유입 가속"
+                title="검색엔진(IndexNow·Bing·Naver·WebSub)에 사이트맵 색인 Ping 발송"
               >
                 <Sparkles className="w-3.5 h-3.5 text-stone-950" />
-                <span><Translate>⚡ 해외 검색 색인 Ping & 유입 가속 (+5)</Translate></span>
+                <span><Translate>📡 검색엔진 색인 Ping 발송</Translate></span>
               </button>
 
               {onOpenPromote && (
@@ -310,22 +299,13 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
               )}
 
               <button
-                onClick={() => handleSimulateLiveVisit()}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer border border-emerald-500 shadow-xs active:scale-95"
-                title="현재 세션으로 실시간 방문 +1 카운트 즉시 테스트"
-              >
-                <PlusCircle className="w-3.5 h-3.5 text-white" />
-                <span><Translate>+1 방문 테스트</Translate></span>
-              </button>
-
-              <button
-                onClick={() => loadData(false)}
+                onClick={() => loadData(true)}
                 disabled={isRefreshing}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-stone-200 rounded-xl text-xs font-medium transition-colors cursor-pointer border border-white/10"
-                title="통계 새로고침"
+                title="클라우드 실측 통계 새로고침"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-amber-400" : ""}`} />
-                <span className="hidden md:inline"><Translate>새로고침</Translate></span>
+                <span><Translate>실측 동기화</Translate></span>
               </button>
 
               <button
@@ -385,17 +365,17 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
               </div>
             ) : (
               <>
-                {/* 4-Pillar Global Traffic Countermeasure & Mode Control Banner */}
+                {/* Transparency & Tracking Mode Control Banner */}
                 <div className={`p-4 rounded-2xl border flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 text-xs ${
-                  trackingMode === "campaign"
+                  trackingMode === "real"
                     ? "bg-emerald-50/90 border-emerald-200 text-emerald-950"
                     : trackingMode === "zero"
                     ? "bg-sky-50/90 border-sky-200 text-sky-950"
-                    : "bg-amber-50/80 border-amber-200 text-stone-800"
+                    : "bg-amber-50/90 border-amber-300 text-stone-900"
                 }`}>
                   <div className="flex items-start gap-3">
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                      trackingMode === "campaign"
+                      trackingMode === "real"
                         ? "bg-emerald-600 text-white"
                         : trackingMode === "zero"
                         ? "bg-sky-600 text-white"
@@ -406,46 +386,37 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <strong className="text-sm font-bold">
-                          {trackingMode === "campaign"
-                            ? "🚀 글로벌 홍보 캠페인 유입 가동 + 전 세계 클라우드 통합 집계 중"
+                          {trackingMode === "real"
+                            ? "📡 100% 실측 트래픽 집계 중 (가상 데이터·허수 0건)"
                             : trackingMode === "zero"
-                            ? "🌱 수동 초기화 모드 (초기화 시점 이후 카운트만 집계)"
-                            : "📊 대규모 시연 기준치 모드 (14,821명 + 실시간 가산)"}
+                            ? "🌱 순수 로컬 초기화 모드 (클라우드 누적 제외, 현재 브라우저 세션만 집계)"
+                            : "⚠️ 시연용 데모 데이터 미리보기 중 (실제 방문자 수치 아님)"}
                         </strong>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-200 text-emerald-900">
-                          GLOBAL UTC + ABACUS CLOUD SYNCED
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                          trackingMode === "seed" ? "bg-amber-200 text-amber-950" : "bg-emerald-200 text-emerald-900"
+                        }`}>
+                          {trackingMode === "seed" ? "DEMO ONLY" : "ABACUS CLOUD + LIVE SESSION"}
                         </span>
                       </div>
                       <p className="text-[11px] text-stone-600 leading-relaxed">
-                        {trackingMode === "campaign"
-                          ? "✅ 전 도메인 실시간 동기화 완료: ① 글로벌 UTC 표준시 기준선 + Abacus 클라우드 카운터를 단일 공식으로 결합하여 AI Studio 미리보기와 실제 corea-labs.com(PC·모바일 모든 기기)이 1의 자리까지 동일한 수치를 표시합니다. ② 검색엔진 정적 다국어 HTML 본문 및 11개국 해외 유입이 실시간 반영됩니다."
+                        {trackingMode === "real"
+                          ? "✅ 허수·가상 로그 완전 제거: ① 총 누적/일별 방문자는 전 세계 기기가 공유하는 Abacus 클라우드 실측값(global_visits · day_YYYY-MM-DD)입니다. ② 실시간 접속자와 평균 체류시간은 실제 활성 세션 하트비트(5분 기준)로 측정되며, 오늘 방문자가 0명이면 실시간 접속자도 0명으로 일치합니다. ③ 전 세계 모든 방문자의 국가·유입경로 전수 통계는 상단 GA4 대시보드에서 실측 확인됩니다."
                           : trackingMode === "zero"
-                          ? "데모 및 이전 캠페인 누적치를 배제하고 방금 초기화한 시점부터의 방문만 집계합니다. 해외 홍보 캠페인 누적 유입을 다시 가동하려면 우측의 '글로벌 홍보 유입 모드 가동' 버튼을 누르세요."
-                          : "대규모 발표 및 시연용 기준 데이터(14,821명) 위에 실시간 유입이 누적 가산됩니다."}
+                          ? "클라우드 이전 누적치를 제외하고 방금 초기화한 시점부터 이 기기/서버에 기록된 실제 방문만 집계합니다. 전 세계 클라우드 실측 합산으로 복귀하려면 우측 '실측 모드(클라우드 연동)' 버튼을 누르세요."
+                          : "화면 배치 확인을 위한 시연용 샘플 데이터(14,821명)가 표시 중입니다. 실제 방문자 통계를 보려면 '실측 모드(클라우드 연동)'로 복귀하세요."}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 shrink-0 self-end lg:self-center">
-                    {trackingMode !== "campaign" && (
+                    {trackingMode !== "real" && (
                       <button
-                        onClick={() => executeReset("campaign")}
+                        onClick={() => executeReset("real")}
                         disabled={isResetting}
                         className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-all cursor-pointer text-xs flex items-center gap-1.5 shadow-xs active:scale-95"
                       >
                         <Sparkles className="w-3.5 h-3.5 text-white" />
-                        <span><Translate>글로벌 홍보 유입 모드 가동</Translate></span>
-                      </button>
-                    )}
-
-                    {trackingMode !== "seed" && (
-                      <button
-                        onClick={() => executeReset("seed")}
-                        disabled={isResetting}
-                        className="px-3 py-2 bg-white hover:bg-stone-100 text-stone-700 rounded-xl font-semibold border border-stone-200 transition-colors cursor-pointer text-xs flex items-center gap-1.5 shadow-2xs active:scale-95"
-                      >
-                        <RotateCcw className={`w-3.5 h-3.5 text-stone-500 ${isResetting ? "animate-spin" : ""}`} />
-                        <span><Translate>시연용 (14,821명)</Translate></span>
+                        <span><Translate>실측 모드 (클라우드 연동)</Translate></span>
                       </button>
                     )}
 
@@ -453,10 +424,10 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                       <button
                         onClick={() => executeReset("zero")}
                         disabled={isResetting}
-                        className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition-all cursor-pointer text-xs flex items-center gap-1.5 shadow-xs active:scale-95"
+                        className="px-3 py-2 bg-white hover:bg-rose-50 text-rose-700 rounded-xl font-bold border border-rose-200 transition-all cursor-pointer text-xs flex items-center gap-1.5 shadow-2xs active:scale-95"
                       >
-                        <Trash2 className="w-3.5 h-3.5 text-white" />
-                        <span><Translate>0부터 다시 시작</Translate></span>
+                        <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                        <span><Translate>로컬 로그 초기화 (0부터)</Translate></span>
                       </button>
                     )}
                   </div>
@@ -542,7 +513,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                     </div>
                     <div className="flex items-center gap-1 text-[11px] text-emerald-600 font-semibold">
                       <TrendingUp className="w-3 h-3" />
-                      <span>{isPureRealOnly ? "실제 유입 누적" : "+18.4% 전주 대비"}</span>
+                      <span>{trackingMode === "real" ? "클라우드 실측 누적" : trackingMode === "zero" ? "로컬 실측 누적" : "시연용 샘플 수치"}</span>
                     </div>
                   </div>
 
@@ -563,36 +534,36 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                   {/* International Ratio */}
                   <div className="bg-white p-4 md:p-5 rounded-2xl border border-stone-200/80 shadow-2xs space-y-2">
                     <div className="flex items-center justify-between text-stone-500 text-xs">
-                      <span className="font-semibold text-stone-600"><Translate>해외 방문객 비율</Translate></span>
+                      <span className="font-semibold text-stone-600"><Translate>해외 접속 비중</Translate></span>
                       <Globe className="w-4 h-4 text-emerald-600" />
                     </div>
                     <div className="text-2xl md:text-3xl font-bold font-mono tabular-nums text-emerald-700 tracking-tight">
                       {stats.summary.intlRatio}%
                     </div>
                     <div className="text-[11px] text-emerald-600/80 font-sans">
-                      <Translate>글로벌 관광객 유입 현황</Translate>
+                      <Translate>기록된 실측 세션 기준</Translate>
                     </div>
                   </div>
 
                   {/* Unique Devices */}
                   <div className="bg-white p-4 md:p-5 rounded-2xl border border-stone-200/80 shadow-2xs space-y-2">
                     <div className="flex items-center justify-between text-stone-500 text-xs">
-                      <span className="font-semibold text-stone-600"><Translate>순 방문자 (Unique)</Translate></span>
+                      <span className="font-semibold text-stone-600"><Translate>기록된 고유 세션</Translate></span>
                       <Smartphone className="w-4 h-4 text-purple-600" />
                     </div>
                     <div className="text-2xl md:text-3xl font-bold font-mono tabular-nums text-stone-900 tracking-tight">
                       {stats.summary.uniqueVisitors.toLocaleString()}
                     </div>
                     <div className="text-[11px] text-stone-400 font-sans">
-                      <Translate>고유 디바이스 기준</Translate>
+                      <Translate>이 기기/서버 실측 세션</Translate>
                     </div>
                   </div>
 
                   {/* Live Active */}
                   <div className="bg-gradient-to-br from-stone-900 to-stone-950 text-white p-4 md:p-5 rounded-2xl border border-stone-800 shadow-2xs space-y-2 col-span-2 lg:col-span-1">
                     <div className="flex items-center justify-between text-stone-300 text-xs">
-                      <span className="font-semibold text-amber-300"><Translate>실시간 접속자</Translate></span>
-                      <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+                      <span className="font-semibold text-amber-300"><Translate>실시간 체류 세션</Translate></span>
+                      <Activity className={`w-4 h-4 ${stats.summary.onlineNow > 0 ? "text-emerald-400 animate-pulse" : "text-stone-500"}`} />
                     </div>
                     <div className="text-2xl md:text-3xl font-bold font-mono tabular-nums text-white tracking-tight flex items-center gap-2">
                       <span>{stats.summary.onlineNow}</span>
@@ -600,7 +571,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                     </div>
                     <div className="text-[11px] text-stone-400 flex items-center gap-1 font-mono tabular-nums">
                       <Clock className="w-3 h-3 text-amber-400" />
-                      <span><Translate>평균 체류</Translate>: {stats.summary.avgDuration}</span>
+                      <span><Translate>실측 체류</Translate>: {stats.summary.avgDuration}</span>
                     </div>
                   </div>
 
@@ -635,7 +606,7 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                     {/* Countries List with Progress Bars */}
                     {filteredCountries.length === 0 ? (
                       <div className="py-12 text-center text-xs text-stone-400">
-                        {isPureRealOnly ? "아직 등록된 국가별 유입 데이터가 없습니다. 상단의 '+ 실시간 방문 테스트' 버튼을 누르거나 탭을 이동해보세요." : "검색된 국가가 없습니다."}
+                        {isPureRealOnly ? "아직 이 기기/서버에 기록된 국가별 세션 내역이 없습니다. 전 세계 국가별 전수 통계는 상단 GA4 대시보드에서 확인하세요." : "검색된 국가가 없습니다."}
                       </div>
                     ) : (
                       <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
@@ -916,8 +887,8 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                       </div>
 
                       {stats.referrers.length === 0 ? (
-                        <div className="py-4 text-center text-[11px] text-stone-400">
-                          아래 채널 버튼으로 해외 유입 경로 집계를 테스트해보세요.
+                        <div className="py-6 text-center text-[11px] text-stone-400">
+                          아직 기록된 외부 유입 경로가 없습니다. 아래 버튼으로 실제 UTM 추적 링크를 생성해 배포하세요.
                         </div>
                       ) : (
                         <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
@@ -941,28 +912,11 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                       )}
                     </div>
 
-                    {/* Quick Channel Acquisition Test & Promote Trigger */}
+                    {/* Real UTM Promotion Link Generator Trigger */}
                     <div className="pt-3 border-t border-stone-100 space-y-2">
-                      <div className="text-[10px] font-mono text-stone-400 font-semibold">
-                        ⚡ 해외 채널별 실시간 유입 시뮬레이션 (+1):
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {[
-                          { key: "google", label: "Google 검색" },
-                          { key: "reddit", label: "Reddit" },
-                          { key: "chatgpt", label: "ChatGPT·AI" },
-                          { key: "whatsapp", label: "WhatsApp" },
-                          { key: "qrcode", label: "QR 스캔" },
-                        ].map((ch) => (
-                          <button
-                            key={ch.key}
-                            onClick={() => handleSimulateLiveVisit(ch.key, ch.label)}
-                            className="px-2 py-1 rounded-lg bg-stone-100 hover:bg-amber-100 hover:text-amber-900 text-stone-700 text-[10px] font-mono font-semibold transition-colors cursor-pointer"
-                          >
-                            +{ch.label}
-                          </button>
-                        ))}
-                      </div>
+                      <p className="text-[11px] text-stone-500 leading-relaxed">
+                        실제 방문자의 유입 채널(Reddit·X·WhatsApp·QR)은 UTM 링크 및 Google Analytics 4를 통해 자동 실측됩니다.
+                      </p>
                       {onOpenPromote && (
                         <button
                           onClick={onOpenPromote}
@@ -984,10 +938,10 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                     <div>
                       <h4 className="font-bold text-stone-900 text-sm flex items-center gap-2">
                         <Activity className="w-4 h-4 text-emerald-500" />
-                        <Translate>실시간 접속자 및 유입 경로 로그 (Recent Live Visitors & Channels)</Translate>
+                        <Translate>실측 접속 세션 로그 (Recorded Real Visitor Sessions)</Translate>
                       </h4>
                       <p className="text-[11px] text-stone-400">
-                        <Translate>전 세계에서 corea-labs.com으로 유입된 최근 방문자의 국가, 유입 채널(Referrer/UTM), 방문 섹션</Translate>
+                        <Translate>샘플/가상 데이터 없이 실제 브라우저·서버 세션에서 측정된 유입 경로, 페이지 및 체류시간 기록</Translate>
                       </p>
                     </div>
                     <span className="text-[10px] font-mono tabular-nums text-stone-400">
@@ -995,49 +949,56 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
                     </span>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className="border-b border-stone-100 text-[11px] text-stone-400 uppercase font-mono">
-                          <th className="py-2 px-3">국가 / 위치</th>
-                          <th className="py-2 px-3">유입 경로 (Source / UTM)</th>
-                          <th className="py-2 px-3">방문 페이지</th>
-                          <th className="py-2 px-3">언어</th>
-                          <th className="py-2 px-3">기기</th>
-                          <th className="py-2 px-3 text-right">방문 시간</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-stone-50 font-sans">
-                        {stats.recentVisitors.slice(0, 12).map((v) => (
-                          <tr key={v.id} className="hover:bg-stone-50/80 transition-colors">
-                            <td className="py-2.5 px-3 flex items-center gap-2 font-medium text-stone-800">
-                              <span className="text-base">{v.flag}</span>
-                              <span>{v.country}</span>
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200/70 font-mono text-[11px] font-medium">
-                                {v.referrer || "직접 접속 (Direct / 북마크)"}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <span className="px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 font-mono text-[11px]">
-                                /{v.path}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 uppercase font-mono text-stone-600 font-semibold">
-                              {v.language}
-                            </td>
-                            <td className="py-2.5 px-3 text-stone-600 capitalize">
-                              {v.device}
-                            </td>
-                            <td className="py-2.5 px-3 text-right font-mono tabular-nums text-stone-400 text-[11px]">
-                              {new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                            </td>
+                  {stats.recentVisitors.length === 0 ? (
+                    <div className="py-10 text-center text-xs text-stone-400">
+                      기록된 실제 접속 로그가 없습니다. (가상 샘플 로그를 생성하지 않습니다)
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-stone-100 text-[11px] text-stone-400 uppercase font-mono">
+                            <th className="py-2 px-3">국가 / 타임존</th>
+                            <th className="py-2 px-3">유입 경로 (Source / UTM)</th>
+                            <th className="py-2 px-3">방문 페이지</th>
+                            <th className="py-2 px-3">언어</th>
+                            <th className="py-2 px-3">기기</th>
+                            <th className="py-2 px-3 text-right">체류 / 시간</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y divide-stone-50 font-sans">
+                          {stats.recentVisitors.slice(0, 12).map((v) => (
+                            <tr key={v.id} className="hover:bg-stone-50/80 transition-colors">
+                              <td className="py-2.5 px-3 flex items-center gap-2 font-medium text-stone-800">
+                                <span className="text-base">{v.flag}</span>
+                                <span>{v.country}</span>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200/70 font-mono text-[11px] font-medium">
+                                  {v.referrer || "직접 접속 (Direct / 북마크)"}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className="px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 font-mono text-[11px]">
+                                  /{v.path}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 uppercase font-mono text-stone-600 font-semibold">
+                                {v.language}
+                              </td>
+                              <td className="py-2.5 px-3 text-stone-600 capitalize">
+                                {v.device}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono tabular-nums text-stone-500 text-[11px]">
+                                {typeof v.staySeconds === "number" && v.staySeconds > 0 ? `${formatDurationSeconds(v.staySeconds)} · ` : ""}
+                                {new Date(v.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
 
               </>
@@ -1053,23 +1014,33 @@ export default function AdminAnalyticsDashboard({ isOpen, onClose, onOpenPromote
               </div>
               <span className="hidden sm:inline text-stone-300">•</span>
               <button
+                onClick={() => executeReset("real")}
+                disabled={isResetting}
+                className="text-stone-600 hover:text-emerald-700 transition-colors cursor-pointer text-[11px] font-semibold underline flex items-center gap-1"
+                title="Abacus 클라우드 연동 100% 실측 모드로 전환"
+              >
+                <Sparkles className="w-3 h-3 text-emerald-600" />
+                <Translate>실측 모드 (클라우드 연동)</Translate>
+              </button>
+              <span className="text-stone-300">|</span>
+              <button
                 onClick={() => executeReset("zero")}
                 disabled={isResetting}
                 className="text-stone-500 hover:text-rose-600 transition-colors cursor-pointer text-[11px] font-medium underline flex items-center gap-1"
-                title="인위적 시드를 모두 지우고 실제 유입자만 0부터 집계"
+                title="로컬 상세 로그를 지우고 0부터 집계"
               >
                 <Trash2 className="w-3 h-3 text-rose-500" />
-                <Translate>데모 데이터 지우기 (순수 실제 0부터 집계)</Translate>
+                <Translate>로컬 로그 초기화</Translate>
               </button>
               <span className="text-stone-300">|</span>
               <button
                 onClick={() => executeReset("seed")}
                 disabled={isResetting}
                 className="text-stone-400 hover:text-stone-600 transition-colors cursor-pointer text-[11px] underline flex items-center gap-1"
-                title="데모 기준치 시드로 복원"
+                title="UI 시연용 데모 데이터 미리보기"
               >
                 <RotateCcw className="w-3 h-3 text-stone-400" />
-                <Translate>데모 기준치 복구</Translate>
+                <Translate>시연용 데모 미리보기</Translate>
               </button>
             </div>
 

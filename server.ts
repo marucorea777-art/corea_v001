@@ -390,12 +390,33 @@ ${JSON.stringify(texts, null, 2)}`;
     "Australia/Melbourne": { code: "AU", name: "Australia", flag: "🇦🇺" },
   };
 
+  function getKstDateStringServer(date: Date = new Date()): string {
+    try {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(date);
+    } catch {
+      return new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().split("T")[0];
+    }
+  }
+
+  function formatDurationSecondsServer(totalSeconds: number): string {
+    if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return "0m 00s";
+    const rounded = Math.round(totalSeconds);
+    const mins = Math.floor(rounded / 60);
+    const secs = rounded % 60;
+    return `${mins}m ${secs.toString().padStart(2, "0")}s`;
+  }
+
   function getDatesLastNDays(n: number = 14): string[] {
     const dates: string[] = [];
+    const base = new Date();
     for (let i = n - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      dates.push(d.toISOString().split("T")[0]);
+      const d = new Date(base.getTime() - i * 86400000);
+      dates.push(getKstDateStringServer(d));
     }
     return dates;
   }
@@ -480,8 +501,8 @@ ${JSON.stringify(texts, null, 2)}`;
     };
   }
 
-  function getZeroAnalytics() {
-    const today = new Date().toISOString().split("T")[0];
+  function getZeroAnalytics(mode: "real" | "zero" = "real") {
+    const today = getKstDateStringServer();
     const dates = getDatesLastNDays(14);
     const dailyStats: Record<string, number> = {};
     dates.forEach(d => {
@@ -489,11 +510,13 @@ ${JSON.stringify(texts, null, 2)}`;
     });
 
     return {
-      trackingMode: "zero",
+      trackingMode: mode,
       isPureRealOnly: true,
       totalVisits: 0,
       uniqueVisitorsCount: 0,
       uniqueSessionIds: {},
+      activeSessions: {},
+      sessionDurations: {},
       todayDate: today,
       dailyStats,
       countryStats: {},
@@ -505,81 +528,8 @@ ${JSON.stringify(texts, null, 2)}`;
     };
   }
 
-  function getCampaignAnalytics() {
-    const today = new Date().toISOString().split("T")[0];
-    const dates = getDatesLastNDays(14);
-    const dailyStats: Record<string, number> = {};
-    const campaignCurve = [9, 12, 11, 15, 14, 18, 21, 19, 24, 31, 78, 134, 182, 216];
-    dates.forEach((dateStr, idx) => {
-      dailyStats[dateStr] = campaignCurve[idx] ?? 140;
-    });
-    const totalVisits = Object.values(dailyStats).reduce((a, b) => a + b, 0);
-
-    return {
-      trackingMode: "campaign",
-      isPureRealOnly: true,
-      totalVisits,
-      uniqueVisitorsCount: Math.round(totalVisits * 0.82),
-      uniqueSessionIds: { sess_campaign_init: true },
-      todayDate: today,
-      dailyStats,
-      countryStats: {
-        US: { code: "US", name: "United States", flag: "🇺🇸", count: 238 },
-        JP: { code: "JP", name: "Japan", flag: "🇯🇵", count: 146 },
-        CN: { code: "CN", name: "China", flag: "🇨🇳", count: 94 },
-        TW: { code: "TW", name: "Taiwan", flag: "🇹🇼", count: 68 },
-        GB: { code: "GB", name: "United Kingdom", flag: "🇬🇧", count: 52 },
-        FR: { code: "FR", name: "France", flag: "🇫🇷", count: 44 },
-        DE: { code: "DE", name: "Germany", flag: "🇩🇪", count: 36 },
-        TH: { code: "TH", name: "Thailand", flag: "🇹🇭", count: 32 },
-        KR: { code: "KR", name: "South Korea", flag: "🇰🇷", count: 28 },
-        CA: { code: "CA", name: "Canada", flag: "🇨🇦", count: 24 },
-        AU: { code: "AU", name: "Australia", flag: "🇦🇺", count: 14 },
-        ES: { code: "ES", name: "Spain", flag: "🇪🇸", count: 8 },
-      },
-      languageStats: {
-        en: { code: "en", name: "English (영어)", count: 396 },
-        ja: { code: "ja", name: "Japanese (일본어)", count: 146 },
-        zh: { code: "zh", name: "Chinese (중국어)", count: 152 },
-        fr: { code: "fr", name: "French (프랑스어)", count: 34 },
-        th: { code: "th", name: "Thai (태국어)", count: 28 },
-        ko: { code: "ko", name: "Korean (한국어)", count: 20 },
-        es: { code: "es", name: "Spanish (스페인어)", count: 8 },
-      },
-      pageStats: {
-        festivals: { path: "festivals", name: "전국 축제 (Festivals)", count: 312 },
-        travel: { path: "travel", name: "입국 & 환전 가이드 (Travel Guide)", count: 184 },
-        places: { path: "places", name: "추천 명소 (Places)", count: 136 },
-        heritage: { path: "heritage", name: "왕실 문화유산 (Heritage)", count: 92 },
-        home: { path: "home", name: "홈 & 코리아 랩스 (Home)", count: 38 },
-        culture: { path: "culture", name: "전통 문화 (Culture)", count: 22 },
-      },
-      deviceStats: {
-        mobile: { name: "모바일 (Mobile)", count: 542 },
-        desktop: { name: "데스크톱 (Desktop)", count: 214 },
-        tablet: { name: "태블릿 (Tablet)", count: 28 },
-      },
-      referrerStats: {
-        "Google Search": { name: "Google / 글로벌 검색 (자연 유입)", count: 284 },
-        "Reddit (r/koreatravel)": { name: "Reddit (r/koreatravel 커뮤니티)", count: 148 },
-        "AI Search (ChatGPT / Perplexity)": { name: "AI 검색 추천 (ChatGPT·Perplexity)", count: 116 },
-        "X (Twitter)": { name: "X (트위터) 글로벌 여행 추천", count: 88 },
-        "WhatsApp": { name: "WhatsApp 글로벌 메신저 공유", count: 64 },
-        "Xiaohongshu (小红书)": { name: "Xiaohongshu (중국 샤오홍슈·웨이보)", count: 46 },
-        "Direct / corea-labs.com": { name: "직접 접속 (Direct / 북마크)", count: 38 },
-      },
-      recentVisitors: [
-        { id: "v_c1", timestamp: new Date(Date.now() - 1000 * 18).toISOString(), country: "United States", flag: "🇺🇸", code: "US", path: "festivals", device: "mobile", language: "en", referrer: "Google / 글로벌 검색 (자연 유입)" },
-        { id: "v_c2", timestamp: new Date(Date.now() - 1000 * 52).toISOString(), country: "Japan", flag: "🇯🇵", code: "JP", path: "places", device: "mobile", language: "ja", referrer: "X (트위터) 글로벌 여행 추천" },
-        { id: "v_c3", timestamp: new Date(Date.now() - 1000 * 95).toISOString(), country: "France", flag: "🇫🇷", code: "FR", path: "heritage", device: "desktop", language: "fr", referrer: "AI 검색 추천 (ChatGPT·Perplexity)" },
-        { id: "v_c4", timestamp: new Date(Date.now() - 1000 * 140).toISOString(), country: "United Kingdom", flag: "🇬🇧", code: "GB", path: "festivals", device: "desktop", language: "en", referrer: "Reddit (r/koreatravel 커뮤니티)" },
-        { id: "v_c5", timestamp: new Date(Date.now() - 1000 * 210).toISOString(), country: "Taiwan", flag: "🇹🇼", code: "TW", path: "travel", device: "mobile", language: "zh", referrer: "LINE 메신저 (일본·대만·태국)" },
-      ]
-    };
-  }
-
   function getDefaultAnalytics() {
-    return getCampaignAnalytics();
+    return getZeroAnalytics("real");
   }
 
   app.post("/api/analytics/track", (req, res) => {
@@ -613,17 +563,23 @@ ${JSON.stringify(texts, null, 2)}`;
       // Update total visits
       db.analytics.totalVisits = (db.analytics.totalVisits || 0) + 1;
 
-      // Track unique
+      // Track unique + active heartbeat
       if (sessionId) {
         if (!db.analytics.uniqueSessionIds) db.analytics.uniqueSessionIds = {};
         if (!db.analytics.uniqueSessionIds[sessionId]) {
           db.analytics.uniqueSessionIds[sessionId] = true;
-          db.analytics.uniqueVisitorsCount = (db.analytics.uniqueVisitorsCount || 0) + 1;
+          db.analytics.uniqueVisitorsCount = Object.keys(db.analytics.uniqueSessionIds).length;
+        }
+        if (!db.analytics.activeSessions) db.analytics.activeSessions = {};
+        db.analytics.activeSessions[sessionId] = Date.now();
+        if (!db.analytics.sessionDurations) db.analytics.sessionDurations = {};
+        if (typeof db.analytics.sessionDurations[sessionId] !== "number") {
+          db.analytics.sessionDurations[sessionId] = 1;
         }
       }
 
-      // Daily stats
-      const today = new Date().toISOString().split("T")[0];
+      // Daily stats (KST)
+      const today = getKstDateStringServer();
       if (!db.analytics.dailyStats) db.analytics.dailyStats = {};
       db.analytics.dailyStats[today] = (db.analytics.dailyStats[today] || 0) + 1;
 
@@ -679,6 +635,7 @@ ${JSON.stringify(texts, null, 2)}`;
       if (!db.analytics.recentVisitors) db.analytics.recentVisitors = [];
       db.analytics.recentVisitors.unshift({
         id: "v_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+        sessionId: sessionId || undefined,
         timestamp: new Date().toISOString(),
         country: detectedCountry.name,
         flag: detectedCountry.flag,
@@ -686,7 +643,8 @@ ${JSON.stringify(texts, null, 2)}`;
         path: pKey,
         device: dKey,
         language: langKey,
-        referrer: referrer || "직접 접속 (Direct / 북마크)"
+        referrer: referrer || "직접 접속 (Direct / 북마크)",
+        staySeconds: sessionId ? (db.analytics.sessionDurations?.[sessionId] || 1) : 1
       });
       if (db.analytics.recentVisitors.length > 50) {
         db.analytics.recentVisitors = db.analytics.recentVisitors.slice(0, 50);
@@ -696,6 +654,42 @@ ${JSON.stringify(texts, null, 2)}`;
       res.json({ success: true });
     } catch (e: any) {
       console.error("Analytics track error:", e);
+      res.json({ success: false });
+    }
+  });
+
+  app.post("/api/analytics/heartbeat", (req, res) => {
+    try {
+      const { sessionId, staySeconds } = req.body || {};
+      if (!sessionId || typeof sessionId !== "string") {
+        return res.json({ success: false });
+      }
+      const db = getDb();
+      if (!db.analytics) {
+        db.analytics = getDefaultAnalytics();
+      }
+      if (db.analytics.trackingMode === "seed") {
+        return res.json({ success: true });
+      }
+      if (!db.analytics.activeSessions) db.analytics.activeSessions = {};
+      db.analytics.activeSessions[sessionId] = Date.now();
+      if (!db.analytics.sessionDurations) db.analytics.sessionDurations = {};
+      if (typeof staySeconds === "number" && staySeconds >= 0) {
+        db.analytics.sessionDurations[sessionId] = Math.max(
+          db.analytics.sessionDurations[sessionId] || 0,
+          Math.round(staySeconds)
+        );
+      }
+      if (Array.isArray(db.analytics.recentVisitors)) {
+        const entry = db.analytics.recentVisitors.find((v: any) => v.sessionId === sessionId);
+        if (entry) {
+          entry.staySeconds = db.analytics.sessionDurations[sessionId];
+          entry.timestamp = new Date().toISOString();
+        }
+      }
+      saveDb(db);
+      res.json({ success: true });
+    } catch {
       res.json({ success: false });
     }
   });
@@ -710,38 +704,44 @@ ${JSON.stringify(texts, null, 2)}`;
       }
 
       const an = db.analytics;
-      const mode = an.trackingMode || (an.isPureRealOnly ? "campaign" : "seed");
+      const mode = an.trackingMode === "seed" ? "seed" : an.trackingMode === "zero" ? "zero" : "real";
       const isPureReal = mode !== "seed";
       const total = an.totalVisits || 0;
-      const today = new Date().toISOString().split("T")[0];
+      const today = getKstDateStringServer();
       const todayVisits = an.dailyStats?.[today] ?? 0;
 
       // Calculate country list with percentages
-      const countryList = Object.values(an.countryStats || {})
+      const countryValues = Object.values(an.countryStats || {}) as any[];
+      const countryDenom = countryValues.reduce((acc: number, c: any) => acc + (c.count || 0), 0);
+      const countryList = countryValues
         .map((c: any) => ({
           ...c,
-          percentage: total > 0 ? Number(((c.count / total) * 100).toFixed(1)) : 0
+          percentage: countryDenom > 0 ? Number(((c.count / countryDenom) * 100).toFixed(1)) : 0
         }))
         .sort((a: any, b: any) => b.count - a.count);
 
       // International visitor ratio (everything except KR)
       const krCount = an.countryStats?.["KR"]?.count || 0;
-      const intlCount = Math.max(0, total - krCount);
-      const intlRatio = total > 0 ? Number(((intlCount / total) * 100).toFixed(1)) : 0;
+      const intlCount = Math.max(0, countryDenom - krCount);
+      const intlRatio = countryDenom > 0 ? Number(((intlCount / countryDenom) * 100).toFixed(1)) : 0;
 
       // Language list
-      const languageList = Object.values(an.languageStats || {})
+      const langValues = Object.values(an.languageStats || {}) as any[];
+      const langDenom = langValues.reduce((acc: number, l: any) => acc + (l.count || 0), 0);
+      const languageList = langValues
         .map((l: any) => ({
           ...l,
-          percentage: total > 0 ? Number(((l.count / total) * 100).toFixed(1)) : 0
+          percentage: langDenom > 0 ? Number(((l.count / langDenom) * 100).toFixed(1)) : 0
         }))
         .sort((a: any, b: any) => b.count - a.count);
 
       // Page list
-      const pageList = Object.values(an.pageStats || {})
+      const pageValues = Object.values(an.pageStats || {}) as any[];
+      const pageDenom = pageValues.reduce((acc: number, p: any) => acc + (p.count || 0), 0);
+      const pageList = pageValues
         .map((p: any) => ({
           ...p,
-          percentage: total > 0 ? Number(((p.count / total) * 100).toFixed(1)) : 0
+          percentage: pageDenom > 0 ? Number(((p.count / pageDenom) * 100).toFixed(1)) : 0
         }))
         .sort((a: any, b: any) => b.count - a.count);
 
@@ -770,7 +770,22 @@ ${JSON.stringify(texts, null, 2)}`;
         }))
         .sort((a: any, b: any) => b.count - a.count);
 
-      const uniqueVisitors = an.uniqueVisitorsCount ?? (total > 0 ? Math.round(total * 0.81) : 0);
+      const uniqueVisitors = mode === "seed"
+        ? (an.uniqueVisitorsCount || 0)
+        : Math.max(an.uniqueVisitorsCount || 0, Object.keys(an.uniqueSessionIds || {}).length);
+
+      const now = Date.now();
+      const cutoff = now - 5 * 60 * 1000;
+      const activeCount = Object.entries(an.activeSessions || {}).filter(
+        ([, ts]) => typeof ts === "number" && ts >= cutoff
+      ).length;
+      const onlineNow = isPureReal ? (todayVisits <= 0 ? 0 : activeCount) : Math.max(3, activeCount);
+
+      const durations = (Object.values(an.sessionDurations || {}) as number[]).filter(
+        (s) => typeof s === "number" && s > 0
+      );
+      const avgSec = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
+      const avgDuration = mode === "seed" ? "4m 18s" : formatDurationSecondsServer(avgSec);
 
       res.json({
         summary: {
@@ -778,11 +793,11 @@ ${JSON.stringify(texts, null, 2)}`;
           uniqueVisitors,
           todayVisits,
           intlRatio,
-          avgDuration: mode === "zero" ? (total > 0 ? "2m 15s" : "0m 00s") : mode === "campaign" ? "3m 42s" : "4m 18s",
-          onlineNow: mode === "zero" ? (total > 0 ? 1 : 0) : mode === "campaign" ? 6 : Math.floor(Math.random() * 8) + 18,
+          avgDuration,
+          onlineNow,
           isPureRealOnly: isPureReal,
           trackingMode: mode,
-          cloudSynced: true,
+          cloudSynced: mode === "real",
         },
         countries: countryList,
         languages: languageList,
@@ -806,16 +821,16 @@ ${JSON.stringify(texts, null, 2)}`;
       db.analytics = getSeedAnalytics();
       db.analytics.trackingMode = "seed";
       saveDb(db);
-      return res.json({ success: true, message: "통계 데이터가 데모 기준치(시연용 14,821명)로 복원되었습니다.", mode: "seed" });
+      return res.json({ success: true, message: "시연용 데모 데이터 모드로 전환되었습니다.", mode: "seed" });
     }
-    if (mode === "campaign") {
-      db.analytics = getCampaignAnalytics();
+    if (mode === "zero") {
+      db.analytics = getZeroAnalytics("zero");
       saveDb(db);
-      return res.json({ success: true, message: "글로벌 홍보 캠페인 실시간 유입 모드로 가동되었습니다.", mode: "campaign" });
+      return res.json({ success: true, message: "로컬 실측 데이터(0부터 측정)로 초기화되었습니다.", mode: "zero" });
     }
-    db.analytics = getZeroAnalytics();
+    db.analytics = getZeroAnalytics("real");
     saveDb(db);
-    return res.json({ success: true, message: "순수 실제 접속자 데이터(0부터 측정)로 초기화되었습니다.", mode: "zero" });
+    return res.json({ success: true, message: "100% 실측 모드로 전환되었습니다.", mode: "real" });
   });
 
   // --- Traveler Q&A Board API Routes ---
@@ -991,12 +1006,12 @@ Respond concisely (3-6 sentences, using clean bullet points when helpful) in the
     const keyLocation = `https://${host}/${key}.txt`;
     const urlList = [
       `https://${host}/`,
-      `https://${host}/?page=festivals`,
-      `https://${host}/?page=travel`,
-      `https://${host}/?page=places`,
-      `https://${host}/?page=heritage`,
-      `https://${host}/?page=culture`,
-      `https://${host}/?page=qna`,
+      `https://${host}/travel`,
+      `https://${host}/festivals`,
+      `https://${host}/heritage`,
+      `https://${host}/places`,
+      `https://${host}/culture`,
+      `https://${host}/qna`,
       `https://${host}/?lang=en`,
       `https://${host}/?lang=ja`,
       `https://${host}/?lang=zh`,
@@ -1008,16 +1023,16 @@ Respond concisely (3-6 sentences, using clean bullet points when helpful) in the
       `https://${host}/?lang=uk`,
       `https://${host}/?lang=ka`,
       `https://${host}/?lang=ko`,
-      `https://${host}/?page=festivals&lang=en`,
-      `https://${host}/?page=festivals&lang=ja`,
-      `https://${host}/?page=festivals&lang=zh`,
-      `https://${host}/?page=travel&lang=en`,
-      `https://${host}/?page=travel&lang=ja`,
-      `https://${host}/?page=travel&lang=zh`,
-      `https://${host}/?page=heritage&lang=en`,
-      `https://${host}/?page=places&lang=en`,
-      `https://${host}/?page=culture&lang=en`,
-      `https://${host}/?page=qna&lang=en`,
+      `https://${host}/festivals?lang=en`,
+      `https://${host}/festivals?lang=ja`,
+      `https://${host}/festivals?lang=zh`,
+      `https://${host}/travel?lang=en`,
+      `https://${host}/travel?lang=ja`,
+      `https://${host}/travel?lang=zh`,
+      `https://${host}/heritage?lang=en`,
+      `https://${host}/places?lang=en`,
+      `https://${host}/culture?lang=en`,
+      `https://${host}/qna?lang=en`,
       `https://${host}/sitemap.xml`,
       `https://${host}/rss.xml`
     ];

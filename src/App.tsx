@@ -49,8 +49,8 @@ function MainApp() {
   const [liveVisitorCount, setLiveVisitorCount] = useState<{ total: number; today: number }>(() => {
     const initial = getAnalyticsStatsSync();
     return {
-      total: initial?.summary?.totalVisits ?? 1500,
-      today: initial?.summary?.todayVisits ?? 145
+      total: initial?.summary?.totalVisits ?? 0,
+      today: initial?.summary?.todayVisits ?? 0
     };
   });
   const { language } = useTranslation();
@@ -132,11 +132,11 @@ function MainApp() {
       const resolvedTitle = sectionTitles[language] || sectionTitles.en;
       document.title = resolvedTitle;
 
+      const canonicalPath = activeTab && activeTab !== "home" ? `/${activeTab}` : "/";
       const params = new URLSearchParams();
-      if (activeTab && activeTab !== "home") params.set("page", activeTab);
       if (language && language !== "ko") params.set("lang", language);
       const queryStr = params.toString();
-      const canonicalHref = `https://corea-labs.com/${queryStr ? `?${queryStr}` : ""}`;
+      const canonicalHref = `https://corea-labs.com${canonicalPath}${queryStr ? `?${queryStr}` : ""}`;
 
       const canonicalEl = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
       if (canonicalEl) canonicalEl.href = canonicalHref;
@@ -161,12 +161,9 @@ function MainApp() {
     if (typeof window !== "undefined") {
       try {
         const url = new URL(window.location.href);
-        if (tab === "home") {
-          url.searchParams.delete("page");
-          url.searchParams.delete("tab");
-        } else {
-          url.searchParams.set("page", tab);
-        }
+        url.pathname = tab === "home" ? "/" : `/${tab}`;
+        url.searchParams.delete("page");
+        url.searchParams.delete("tab");
         window.history.replaceState({}, "", url.toString());
       } catch {}
       window.scrollTo({ top: 0, behavior: "smooth" });

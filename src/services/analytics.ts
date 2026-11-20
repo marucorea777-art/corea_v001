@@ -6,8 +6,10 @@ export interface VisitorSummary {
   avgDuration: string;
   onlineNow: number;
   isPureRealOnly?: boolean;
-  trackingMode?: "campaign" | "seed" | "zero";
+  trackingMode?: "real" | "zero" | "seed";
   cloudSynced?: boolean;
+  cloudTotal?: number;
+  detailedSessionsCount?: number;
 }
 
 export interface CountryStat {
@@ -51,6 +53,7 @@ export interface DailyTrendItem {
 
 export interface RecentVisitorItem {
   id: string;
+  sessionId?: string;
   timestamp: string;
   country: string;
   flag: string;
@@ -59,6 +62,7 @@ export interface RecentVisitorItem {
   device: string;
   language: string;
   referrer?: string;
+  staySeconds?: number;
 }
 
 export interface AnalyticsStatsResponse {
@@ -73,11 +77,14 @@ export interface AnalyticsStatsResponse {
 }
 
 interface PersistentAnalyticsLedger {
-  trackingMode?: "campaign" | "seed" | "zero";
+  trackingMode?: "real" | "zero" | "seed";
   isPureRealOnly: boolean;
   totalVisits: number;
+  localVisitsCount?: number;
   uniqueVisitorsCount: number;
   uniqueSessionIds: Record<string, boolean>;
+  activeSessions: Record<string, number>;
+  sessionDurations: Record<string, number>;
   todayDate: string;
   dailyStats: Record<string, number>;
   countryStats: Record<string, { code: string; name: string; flag: string; count: number }>;
@@ -87,17 +94,22 @@ interface PersistentAnalyticsLedger {
   referrerStats: Record<string, { name: string; count: number }>;
   recentVisitors: RecentVisitorItem[];
   lastUpdated: number;
-  cloudBaselineTotal?: number;
   lastSyncedCloudTotal?: number;
-  lastAutoCatchupTime?: number;
 }
 
-const LEDGER_STORAGE_KEY = "corea_labs_realtime_ledger_v3";
-const ANALYTICS_CACHE_KEY = "corea_labs_analytics_cache_v3";
-const ANALYTICS_MODE_KEY = "corea_labs_analytics_mode_v3";
-const BROADCAST_CHANNEL_NAME = "corea_labs_analytics_channel";
+// Bumped storage keys to v4/v7 so stale synthetic v3 campaign caches are discarded automatically
+const LEDGER_STORAGE_KEY = "corea_labs_realtime_ledger_v4";
+const ANALYTICS_CACHE_KEY = "corea_labs_analytics_cache_v4";
+const ANALYTICS_MODE_KEY = "corea_labs_analytics_mode_v4";
+const CLOUD_COUNT_CACHE_KEY = "corea_labs_abacus_cloud_count_v7";
+const CLOUD_DAILY_MAP_KEY = "corea_labs_abacus_daily_map_v7";
+const SESSION_ELAPSED_KEY = "corea_labs_session_elapsed_sec_v4";
+
+const BROADCAST_CHANNEL_NAME = "corea_labs_analytics_channel_v4";
 const ABACUS_CLOUD_BASE = "https://abacus.jasoncameron.dev";
 const ABACUS_NAMESPACE = "corea-labs.com";
+const REAL_CLOUD_DAILY_START_DATE = "2026-11-17";
+const ACTIVE_SESSION_WINDOW_MS = 5 * 60 * 1000; // 5 minutes active window for live online count
 
 const TIMEZONE_TO_COUNTRY: Record<string, { code: string; name: string; flag: string }> = {
   "Asia/Seoul": { code: "KR", name: "South Korea", flag: "🇰🇷" },
@@ -154,6 +166,7 @@ const PAGE_LABELS: Record<string, string> = {
   places: "추천 명소 (Places)",
   festivals: "전국 축제 (Festivals)",
   travel: "입국 & 환전 가이드 (Travel Guide)",
+  qna: "글로벌 여행 Q&A (Q&A)",
   privacy: "개인정보처리방침 (Privacy Policy)",
   terms: "이용약관 (Terms of Service)",
   about: "사이트 소개 (About Corea Labs)",
@@ -164,21 +177,6 @@ const DEVICE_LABELS: Record<string, string> = {
   desktop: "데스크톱 (Desktop)",
   tablet: "태블릿 (Tablet)",
 };
-
-const GLOBAL_STREAM_PROFILES = [
-  { country: { code: "US", name: "United States", flag: "🇺🇸" }, lang: "en", page: "festivals", device: "mobile" as const, refKey: "Google Search", refLabel: "Google / 글로벌 검색 (자연 유입)" },
-  { country: { code: "JP", name: "Japan", flag: "🇯🇵" }, lang: "ja", page: "places", device: "mobile" as const, refKey: "X (Twitter)", refLabel: "X (트위터) 글로벌 여행 추천" },
-  { country: { code: "FR", name: "France", flag: "🇫🇷" }, lang: "fr", page: "heritage", device: "desktop" as const, refKey: "AI Search (ChatGPT / Perplexity)", refLabel: "AI 검색 추천 (ChatGPT·Perplexity)" },
-  { country: { code: "TW", name: "Taiwan", flag: "🇹🇼" }, lang: "zh", page: "travel", device: "mobile" as const, refKey: "LINE / Others", refLabel: "LINE 메신저 (일본·대만·태국)" },
-  { country: { code: "GB", name: "United Kingdom", flag: "🇬🇧" }, lang: "en", page: "festivals", device: "desktop" as const, refKey: "Reddit (r/koreatravel)", refLabel: "Reddit (r/koreatravel 커뮤니티)" },
-  { country: { code: "CN", name: "China", flag: "🇨🇳" }, lang: "zh", page: "places", device: "mobile" as const, refKey: "Xiaohongshu (小红书)", refLabel: "Xiaohongshu (중국 샤오홍슈·웨이보)" },
-  { country: { code: "DE", name: "Germany", flag: "🇩🇪" }, lang: "en", page: "culture", device: "desktop" as const, refKey: "Google Search", refLabel: "Google / 글로벌 검색 (자연 유입)" },
-  { country: { code: "TH", name: "Thailand", flag: "🇹🇭" }, lang: "th", page: "festivals", device: "mobile" as const, refKey: "WhatsApp", refLabel: "WhatsApp 글로벌 메신저 공유" },
-  { country: { code: "CA", name: "Canada", flag: "🇨🇦" }, lang: "en", page: "travel", device: "mobile" as const, refKey: "Reddit (r/koreatravel)", refLabel: "Reddit (r/koreatravel 커뮤니티)" },
-  { country: { code: "ES", name: "Spain", flag: "🇪🇸" }, lang: "es", page: "heritage", device: "mobile" as const, refKey: "AI Search (ChatGPT / Perplexity)", refLabel: "AI 검색 추천 (ChatGPT·Perplexity)" },
-  { country: { code: "AU", name: "Australia", flag: "🇦🇺" }, lang: "en", page: "places", device: "desktop" as const, refKey: "Google Search", refLabel: "Google / 글로벌 검색 (자연 유입)" },
-  { country: { code: "SG", name: "Singapore", flag: "🇸🇬" }, lang: "en", page: "festivals", device: "mobile" as const, refKey: "WhatsApp", refLabel: "WhatsApp 글로벌 메신저 공유" },
-];
 
 export function getKstDateString(date: Date = new Date()): string {
   try {
@@ -224,8 +222,16 @@ function resolveCountry(timezone: string, language: string): { code: string; nam
   return { code: "US", name: "United States", flag: "🇺🇸" };
 }
 
-export function createZeroLedger(): PersistentAnalyticsLedger {
-  const today = new Date().toISOString().split("T")[0];
+export function formatDurationSeconds(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return "0m 00s";
+  const rounded = Math.round(totalSeconds);
+  const mins = Math.floor(rounded / 60);
+  const secs = rounded % 60;
+  return `${mins}m ${secs.toString().padStart(2, "0")}s`;
+}
+
+export function createEmptyRealLedger(mode: "real" | "zero" = "real"): PersistentAnalyticsLedger {
+  const today = getKstDateString();
   const dates = getDatesLastNDays(14);
   const dailyStats: Record<string, number> = {};
   dates.forEach((d) => {
@@ -233,11 +239,14 @@ export function createZeroLedger(): PersistentAnalyticsLedger {
   });
 
   return {
-    trackingMode: "zero",
+    trackingMode: mode,
     isPureRealOnly: true,
     totalVisits: 0,
+    localVisitsCount: 0,
     uniqueVisitorsCount: 0,
     uniqueSessionIds: {},
+    activeSessions: {},
+    sessionDurations: {},
     todayDate: today,
     dailyStats,
     countryStats: {},
@@ -247,122 +256,16 @@ export function createZeroLedger(): PersistentAnalyticsLedger {
     referrerStats: {},
     recentVisitors: [],
     lastUpdated: Date.now(),
-    lastAutoCatchupTime: Date.now(),
   };
 }
 
-// Fixed historical daily counts anchored strictly to calendar dates (NEVER shifts or shrinks on midnight rollover)
-const FIXED_HISTORICAL_DAILY_MAP: Record<string, number> = {
-  "2026-11-03": 9,
-  "2026-11-04": 12,
-  "2026-11-05": 11,
-  "2026-11-06": 15,
-  "2026-11-07": 14,
-  "2026-11-08": 18,
-  "2026-11-09": 21,
-  "2026-11-10": 19,
-  "2026-11-11": 24,
-  "2026-11-12": 31,
-  "2026-11-13": 78,
-  "2026-11-14": 135,
-  "2026-11-15": 182,
-  "2026-11-16": 220,
-};
-const HISTORICAL_CAMPAIGN_TOTAL_BASE = 784;
-const HISTORICAL_CLOUD_BASE_THROUGH_NOV16 = 115;
-const REAL_CLOUD_DAILY_START_DATE = "2026-11-17";
-
-/**
- * Global Promotion Campaign Active Ledger:
- * Anchors pre-2026-11-17 campaign baseline to fixed calendar dates and uses real Abacus per-day counters
- * from 2026-11-17 onward so yesterday's / today's count NEVER shrinks when the date rolls over.
- */
-export function createCampaignLedger(): PersistentAnalyticsLedger {
-  const today = getKstDateString();
-  const dates = getDatesLastNDays(14);
-  const dailyStats: Record<string, number> = {};
-  dates.forEach((dateStr) => {
-    if (dateStr < REAL_CLOUD_DAILY_START_DATE) {
-      dailyStats[dateStr] = FIXED_HISTORICAL_DAILY_MAP[dateStr] ?? 12;
-    } else {
-      dailyStats[dateStr] = 0;
-    }
-  });
-
-  const totalVisits = HISTORICAL_CAMPAIGN_TOTAL_BASE; // 784 baseline before cloud delta
-
-  return {
-    trackingMode: "campaign",
-    isPureRealOnly: true,
-    totalVisits,
-    uniqueVisitorsCount: Math.round(totalVisits * 0.82),
-    uniqueSessionIds: { sess_campaign_init: true },
-    todayDate: today,
-    dailyStats,
-    countryStats: {
-      US: { code: "US", name: "United States", flag: "🇺🇸", count: 238 },
-      JP: { code: "JP", name: "Japan", flag: "🇯🇵", count: 146 },
-      CN: { code: "CN", name: "China", flag: "🇨🇳", count: 94 },
-      TW: { code: "TW", name: "Taiwan", flag: "🇹🇼", count: 68 },
-      GB: { code: "GB", name: "United Kingdom", flag: "🇬🇧", count: 52 },
-      FR: { code: "FR", name: "France", flag: "🇫🇷", count: 44 },
-      DE: { code: "DE", name: "Germany", flag: "🇩🇪", count: 36 },
-      TH: { code: "TH", name: "Thailand", flag: "🇹🇭", count: 32 },
-      KR: { code: "KR", name: "South Korea", flag: "🇰🇷", count: 28 },
-      CA: { code: "CA", name: "Canada", flag: "🇨🇦", count: 24 },
-      AU: { code: "AU", name: "Australia", flag: "🇦🇺", count: 14 },
-      ES: { code: "ES", name: "Spain", flag: "🇪🇸", count: 8 },
-    },
-    languageStats: {
-      en: { code: "en", name: "English (영어)", count: 396 },
-      ja: { code: "ja", name: "Japanese (일본어)", count: 146 },
-      zh: { code: "zh", name: "Chinese (중국어)", count: 152 },
-      fr: { code: "fr", name: "French (프랑스어)", count: 34 },
-      th: { code: "th", name: "Thai (태국어)", count: 28 },
-      ko: { code: "ko", name: "Korean (한국어)", count: 20 },
-      es: { code: "es", name: "Spanish (스페인어)", count: 8 },
-    },
-    pageStats: {
-      festivals: { path: "festivals", name: "전국 축제 (Festivals)", count: 312 },
-      travel: { path: "travel", name: "입국 & 환전 가이드 (Travel Guide)", count: 184 },
-      places: { path: "places", name: "추천 명소 (Places)", count: 136 },
-      heritage: { path: "heritage", name: "왕실 문화유산 (Heritage)", count: 92 },
-      home: { path: "home", name: "홈 & 코리아 랩스 (Home)", count: 38 },
-      culture: { path: "culture", name: "전통 문화 (Culture)", count: 22 },
-    },
-    deviceStats: {
-      mobile: { name: "모바일 (Mobile)", count: 542 },
-      desktop: { name: "데스크톱 (Desktop)", count: 214 },
-      tablet: { name: "태블릿 (Tablet)", count: 28 },
-    },
-    referrerStats: {
-      "Google Search": { name: "Google / 글로벌 검색 (자연 유입)", count: 284 },
-      "Reddit (r/koreatravel)": { name: "Reddit (r/koreatravel 커뮤니티)", count: 148 },
-      "AI Search (ChatGPT / Perplexity)": { name: "AI 검색 추천 (ChatGPT·Perplexity)", count: 116 },
-      "X (Twitter)": { name: "X (트위터) 글로벌 여행 추천", count: 88 },
-      "WhatsApp": { name: "WhatsApp 글로벌 메신저 공유", count: 64 },
-      "Xiaohongshu (小红书)": { name: "Xiaohongshu (중국 샤오홍슈·웨이보)", count: 46 },
-      "Direct / corea-labs.com": { name: "직접 접속 (Direct / 북마크)", count: 38 },
-    },
-    recentVisitors: [
-      { id: "v_c1", timestamp: new Date(Date.now() - 1000 * 18).toISOString(), country: "United States", flag: "🇺🇸", code: "US", path: "festivals", device: "mobile", language: "en", referrer: "Google / 글로벌 검색 (자연 유입)" },
-      { id: "v_c2", timestamp: new Date(Date.now() - 1000 * 52).toISOString(), country: "Japan", flag: "🇯🇵", code: "JP", path: "places", device: "mobile", language: "ja", referrer: "X (트위터) 글로벌 여행 추천" },
-      { id: "v_c3", timestamp: new Date(Date.now() - 1000 * 95).toISOString(), country: "France", flag: "🇫🇷", code: "FR", path: "heritage", device: "desktop", language: "fr", referrer: "AI 검색 추천 (ChatGPT·Perplexity)" },
-      { id: "v_c4", timestamp: new Date(Date.now() - 1000 * 140).toISOString(), country: "United Kingdom", flag: "🇬🇧", code: "GB", path: "festivals", device: "desktop", language: "en", referrer: "Reddit (r/koreatravel 커뮤니티)" },
-      { id: "v_c5", timestamp: new Date(Date.now() - 1000 * 210).toISOString(), country: "Taiwan", flag: "🇹🇼", code: "TW", path: "travel", device: "mobile", language: "zh", referrer: "LINE 메신저 (일본·대만·태국)" },
-      { id: "v_c6", timestamp: new Date(Date.now() - 1000 * 290).toISOString(), country: "China", flag: "🇨🇳", code: "CN", path: "places", device: "mobile", language: "zh", referrer: "Xiaohongshu (중국 샤오홍슈·웨이보)" },
-      { id: "v_c7", timestamp: new Date(Date.now() - 1000 * 360).toISOString(), country: "Germany", flag: "🇩🇪", code: "DE", path: "culture", device: "desktop", language: "en", referrer: "Google / 글로벌 검색 (자연 유입)" },
-      { id: "v_c8", timestamp: new Date(Date.now() - 1000 * 440).toISOString(), country: "Thailand", flag: "🇹🇭", code: "TH", path: "festivals", device: "mobile", language: "th", referrer: "WhatsApp 글로벌 메신저 공유" },
-      { id: "v_c9", timestamp: new Date(Date.now() - 1000 * 530).toISOString(), country: "Canada", flag: "🇨🇦", code: "CA", path: "travel", device: "mobile", language: "en", referrer: "Reddit (r/koreatravel 커뮤니티)" },
-      { id: "v_c10", timestamp: new Date(Date.now() - 1000 * 610).toISOString(), country: "United States", flag: "🇺🇸", code: "US", path: "heritage", device: "desktop", language: "en", referrer: "AI 검색 추천 (ChatGPT·Perplexity)" },
-    ],
-    lastUpdated: Date.now(),
-    lastAutoCatchupTime: Date.now(),
-  };
+export function createZeroLedger(): PersistentAnalyticsLedger {
+  return createEmptyRealLedger("zero");
 }
 
+// Explicit Demo Preview Only (never used by default)
 export function createSeedLedger(): PersistentAnalyticsLedger {
-  const today = new Date().toISOString().split("T")[0];
+  const today = getKstDateString();
   const dates = getDatesLastNDays(14);
   const dailyStats: Record<string, number> = {};
   const baseCounts = [310, 335, 360, 380, 410, 395, 420, 385, 412, 398, 445, 480, 520, 433];
@@ -374,8 +277,19 @@ export function createSeedLedger(): PersistentAnalyticsLedger {
     trackingMode: "seed",
     isPureRealOnly: false,
     totalVisits: 14821,
+    localVisitsCount: 14821,
     uniqueVisitorsCount: 11291,
-    uniqueSessionIds: { sess_init_admin: true },
+    uniqueSessionIds: { sess_demo_preview: true },
+    activeSessions: {
+      demo_1: Date.now() - 25000,
+      demo_2: Date.now() - 60000,
+      demo_3: Date.now() - 95000,
+    },
+    sessionDurations: {
+      demo_1: 258,
+      demo_2: 240,
+      demo_3: 276,
+    },
     todayDate: today,
     dailyStats,
     countryStats: {
@@ -428,58 +342,60 @@ export function createSeedLedger(): PersistentAnalyticsLedger {
       "LINE / Others": { name: "LINE 메신저 (일본·대만·태국)", count: 593 },
     },
     recentVisitors: [
-      { id: "v_1", timestamp: new Date(Date.now() - 1000 * 45).toISOString(), country: "United States", flag: "🇺🇸", code: "US", path: "festivals", device: "mobile", language: "en", referrer: "Google / 글로벌 검색 (자연 유입)" },
-      { id: "v_2", timestamp: new Date(Date.now() - 1000 * 120).toISOString(), country: "Japan", flag: "🇯🇵", code: "JP", path: "places", device: "desktop", language: "ja", referrer: "X (트위터) 글로벌 여행 추천" },
-      { id: "v_3", timestamp: new Date(Date.now() - 1000 * 240).toISOString(), country: "France", flag: "🇫🇷", code: "FR", path: "travel", device: "mobile", language: "fr", referrer: "AI 검색 추천 (ChatGPT·Perplexity)" },
-      { id: "v_4", timestamp: new Date(Date.now() - 1000 * 380).toISOString(), country: "United Kingdom", flag: "🇬🇧", code: "GB", path: "festivals", device: "desktop", language: "en", referrer: "Reddit (r/koreatravel 커뮤니티)" },
-      { id: "v_5", timestamp: new Date(Date.now() - 1000 * 520).toISOString(), country: "Taiwan", flag: "🇹🇼", code: "TW", path: "heritage", device: "mobile", language: "zh", referrer: "LINE 메신저 (일본·대만·태국)" },
-      { id: "v_6", timestamp: new Date(Date.now() - 1000 * 680).toISOString(), country: "Germany", flag: "🇩🇪", code: "DE", path: "places", device: "mobile", language: "en", referrer: "WhatsApp 글로벌 메신저 공유" },
-      { id: "v_7", timestamp: new Date(Date.now() - 1000 * 850).toISOString(), country: "Thailand", flag: "🇹🇭", code: "TH", path: "travel", device: "mobile", language: "th", referrer: "Google / 글로벌 검색 (자연 유입)" },
-      { id: "v_8", timestamp: new Date(Date.now() - 1000 * 1100).toISOString(), country: "Australia", flag: "🇦🇺", code: "AU", path: "festivals", device: "desktop", language: "en", referrer: "직접 접속 (Direct / 북마크)" },
+      { id: "v_demo_1", timestamp: new Date(Date.now() - 1000 * 45).toISOString(), country: "United States", flag: "🇺🇸", code: "US", path: "festivals", device: "mobile", language: "en", referrer: "Google / 글로벌 검색 (자연 유입)" },
+      { id: "v_demo_2", timestamp: new Date(Date.now() - 1000 * 120).toISOString(), country: "Japan", flag: "🇯🇵", code: "JP", path: "places", device: "desktop", language: "ja", referrer: "X (트위터) 글로벌 여행 추천" },
+      { id: "v_demo_3", timestamp: new Date(Date.now() - 1000 * 240).toISOString(), country: "France", flag: "🇫🇷", code: "FR", path: "travel", device: "mobile", language: "fr", referrer: "AI 검색 추천 (ChatGPT·Perplexity)" },
     ],
     lastUpdated: Date.now(),
-    lastAutoCatchupTime: Date.now(),
   };
 }
 
 export function computeStatsFromLedger(an: PersistentAnalyticsLedger): AnalyticsStatsResponse {
-  const mode = an.trackingMode || (an.isPureRealOnly ? "campaign" : "seed");
+  const mode: "real" | "zero" | "seed" =
+    an.trackingMode === "seed" ? "seed" : an.trackingMode === "zero" ? "zero" : "real";
   const isPureReal = mode !== "seed";
   const total = an.totalVisits || 0;
   const today = getKstDateString();
   const todayVisits = an.dailyStats?.[today] ?? 0;
 
-  const countryList: CountryStat[] = Object.values(an.countryStats || {})
+  // Use sum of actually recorded demographic entries as denominator so percentages always sum coherently to 100%
+  const countryEntries = Object.values(an.countryStats || {});
+  const countryDenom = countryEntries.reduce((acc, c) => acc + (c.count || 0), 0);
+  const countryList: CountryStat[] = countryEntries
     .map((c) => ({
       ...c,
-      percentage: total > 0 ? Number(((c.count / total) * 100).toFixed(1)) : 0,
+      percentage: countryDenom > 0 ? Number(((c.count / countryDenom) * 100).toFixed(1)) : 0,
     }))
     .sort((a, b) => b.count - a.count);
 
   const krCount = an.countryStats?.["KR"]?.count || 0;
-  const intlCount = Math.max(0, total - krCount);
-  const intlRatio = total > 0 ? Number(((intlCount / total) * 100).toFixed(1)) : 0;
+  const intlCount = Math.max(0, countryDenom - krCount);
+  const intlRatio = countryDenom > 0 ? Number(((intlCount / countryDenom) * 100).toFixed(1)) : 0;
 
-  const languageList: LanguageStat[] = Object.values(an.languageStats || {})
+  const langEntries = Object.values(an.languageStats || {});
+  const langDenom = langEntries.reduce((acc, l) => acc + (l.count || 0), 0);
+  const languageList: LanguageStat[] = langEntries
     .map((l) => ({
       code: l.code,
       name: LANGUAGE_LABELS[l.code] || l.name || l.code,
       count: l.count,
-      percentage: total > 0 ? Number(((l.count / total) * 100).toFixed(1)) : 0,
+      percentage: langDenom > 0 ? Number(((l.count / langDenom) * 100).toFixed(1)) : 0,
     }))
     .sort((a, b) => b.count - a.count);
 
-  const pageList: PageStat[] = Object.values(an.pageStats || {})
+  const pageEntries = Object.values(an.pageStats || {});
+  const pageDenom = pageEntries.reduce((acc, p) => acc + (p.count || 0), 0);
+  const pageList: PageStat[] = pageEntries
     .map((p) => ({
       path: p.path,
       name: PAGE_LABELS[p.path] || p.name || p.path,
       count: p.count,
-      percentage: total > 0 ? Number(((p.count / total) * 100).toFixed(1)) : 0,
+      percentage: pageDenom > 0 ? Number(((p.count / pageDenom) * 100).toFixed(1)) : 0,
     }))
     .sort((a, b) => b.count - a.count);
 
   const deviceValues = Object.values(an.deviceStats || {});
-  const deviceTotal = deviceValues.reduce((acc, d) => acc + (d.count || 0), 0) || 0;
+  const deviceTotal = deviceValues.reduce((acc, d) => acc + (d.count || 0), 0);
   const deviceList: DeviceStat[] = deviceValues
     .map((d) => ({
       name: DEVICE_LABELS[d.name] || d.name,
@@ -495,7 +411,7 @@ export function computeStatsFromLedger(an: PersistentAnalyticsLedger): Analytics
   }));
 
   const referrerValues = Object.values(an.referrerStats || {});
-  const referrerTotal = referrerValues.reduce((acc, r) => acc + (r.count || 0), 0) || 0;
+  const referrerTotal = referrerValues.reduce((acc, r) => acc + (r.count || 0), 0);
   const referrerList: ReferrerStat[] = referrerValues
     .map((r) => ({
       name: r.name,
@@ -504,13 +420,44 @@ export function computeStatsFromLedger(an: PersistentAnalyticsLedger): Analytics
     }))
     .sort((a, b) => b.count - a.count);
 
-  const uniqueVisitors = an.uniqueVisitorsCount ?? (total > 0 ? Math.max(1, Math.round(total * 0.81)) : 0);
+  const uniqueKeysCount = Object.keys(an.uniqueSessionIds || {}).length;
+  const uniqueVisitors =
+    mode === "seed"
+      ? an.uniqueVisitorsCount
+      : Math.max(an.uniqueVisitorsCount || 0, uniqueKeysCount);
 
-  const fifteenMinsAgo = Date.now() - 15 * 60 * 1000;
-  const recentActiveCount = (an.recentVisitors || []).filter((v) => {
-    const t = new Date(v.timestamp).getTime();
-    return !isNaN(t) && t >= fifteenMinsAgo;
-  }).length;
+  // Compute live online visitors strictly from real activeSessions within last 5 minutes
+  const now = Date.now();
+  const cutoff = now - ACTIVE_SESSION_WINDOW_MS;
+  const activeSessionIds = Object.entries(an.activeSessions || {}).filter(
+    ([, lastSeen]) => typeof lastSeen === "number" && lastSeen >= cutoff
+  );
+
+  let rawOnline = activeSessionIds.length;
+  if (rawOnline === 0 && (an.recentVisitors || []).length > 0) {
+    // Fallback strictly from real recent visitor timestamps within 5 minutes
+    const recentSessionSet = new Set<string>();
+    (an.recentVisitors || []).forEach((v) => {
+      const t = new Date(v.timestamp).getTime();
+      if (!isNaN(t) && t >= cutoff) {
+        recentSessionSet.add(v.sessionId || v.id);
+      }
+    });
+    rawOnline = recentSessionSet.size;
+  }
+
+  // Strict consistency invariant: If today's visits is 0 in real mode, onlineNow cannot exceed 0
+  const onlineNow = isPureReal ? (todayVisits <= 0 ? 0 : rawOnline) : rawOnline;
+
+  // Compute average dwell time strictly from real measured session durations
+  const durations = Object.values(an.sessionDurations || {}).filter(
+    (s) => typeof s === "number" && s > 0
+  );
+  const avgDurationSeconds =
+    durations.length > 0
+      ? durations.reduce((sum, sec) => sum + sec, 0) / durations.length
+      : 0;
+  const avgDuration = formatDurationSeconds(avgDurationSeconds);
 
   return {
     summary: {
@@ -518,11 +465,13 @@ export function computeStatsFromLedger(an: PersistentAnalyticsLedger): Analytics
       uniqueVisitors,
       todayVisits,
       intlRatio,
-      avgDuration: mode === "zero" ? (total > 0 ? "2m 15s" : "0m 00s") : mode === "campaign" ? "3m 42s" : "4m 18s",
-      onlineNow: mode === "zero" ? (total > 0 ? Math.max(1, recentActiveCount) : 0) : mode === "campaign" ? Math.max(4, recentActiveCount + 2) : Math.max(18, 18 + recentActiveCount),
+      avgDuration,
+      onlineNow,
       isPureRealOnly: isPureReal,
       trackingMode: mode,
-      cloudSynced: true,
+      cloudSynced: mode === "real",
+      cloudTotal: getCachedCloudCount(),
+      detailedSessionsCount: uniqueKeysCount,
     },
     countries: countryList,
     languages: languageList,
@@ -534,80 +483,8 @@ export function computeStatsFromLedger(an: PersistentAnalyticsLedger): Analytics
   };
 }
 
-function appendProfileVisitToLedger(
-  ledger: PersistentAnalyticsLedger,
-  profile: typeof GLOBAL_STREAM_PROFILES[0],
-  isoTimestamp?: string
-) {
-  const today = (isoTimestamp || new Date().toISOString()).split("T")[0];
-  ledger.totalVisits = (ledger.totalVisits || 0) + 1;
-  ledger.uniqueVisitorsCount = (ledger.uniqueVisitorsCount || 0) + (ledger.totalVisits % 4 !== 0 ? 1 : 0);
-
-  if (!ledger.dailyStats) ledger.dailyStats = {};
-  ledger.dailyStats[today] = (ledger.dailyStats[today] || 0) + 1;
-
-  const cKey = profile.country.code;
-  if (!ledger.countryStats) ledger.countryStats = {};
-  if (!ledger.countryStats[cKey]) {
-    ledger.countryStats[cKey] = { ...profile.country, count: 1 };
-  } else {
-    ledger.countryStats[cKey].count += 1;
-  }
-
-  const langKey = profile.lang;
-  if (!ledger.languageStats) ledger.languageStats = {};
-  if (!ledger.languageStats[langKey]) {
-    ledger.languageStats[langKey] = { code: langKey, name: LANGUAGE_LABELS[langKey] || langKey, count: 1 };
-  } else {
-    ledger.languageStats[langKey].count += 1;
-  }
-
-  const pKey = profile.page;
-  if (!ledger.pageStats) ledger.pageStats = {};
-  if (!ledger.pageStats[pKey]) {
-    ledger.pageStats[pKey] = { path: pKey, name: PAGE_LABELS[pKey] || pKey, count: 1 };
-  } else {
-    ledger.pageStats[pKey].count += 1;
-  }
-
-  const dKey = profile.device;
-  if (!ledger.deviceStats) ledger.deviceStats = {};
-  if (!ledger.deviceStats[dKey]) {
-    ledger.deviceStats[dKey] = { name: DEVICE_LABELS[dKey] || dKey, count: 1 };
-  } else {
-    ledger.deviceStats[dKey].count += 1;
-  }
-
-  const refKey = profile.refKey;
-  if (!ledger.referrerStats) ledger.referrerStats = {};
-  if (!ledger.referrerStats[refKey]) {
-    ledger.referrerStats[refKey] = { name: profile.refLabel, count: 1 };
-  } else {
-    ledger.referrerStats[refKey].count += 1;
-  }
-
-  if (!ledger.recentVisitors) ledger.recentVisitors = [];
-  ledger.recentVisitors.unshift({
-    id: "v_glb_" + (isoTimestamp || Date.now()) + "_" + ledger.totalVisits,
-    timestamp: isoTimestamp || new Date().toISOString(),
-    country: profile.country.name,
-    flag: profile.country.flag,
-    code: profile.country.code,
-    path: pKey,
-    device: dKey,
-    language: langKey,
-    referrer: profile.refLabel,
-  });
-  if (ledger.recentVisitors.length > 50) {
-    ledger.recentVisitors = ledger.recentVisitors.slice(0, 50);
-  }
-}
-
-const CLOUD_COUNT_CACHE_KEY = "corea_labs_abacus_cloud_count_v6";
-const CLOUD_DAILY_MAP_KEY = "corea_labs_abacus_daily_map_v6";
-
 function getCachedCloudCount(): number {
-  if (typeof window === "undefined") return 117;
+  if (typeof window === "undefined") return 0;
   try {
     const raw = localStorage.getItem(CLOUD_COUNT_CACHE_KEY);
     if (raw !== null) {
@@ -615,7 +492,7 @@ function getCachedCloudCount(): number {
       if (!isNaN(parsed) && parsed >= 0) return parsed;
     }
   } catch {}
-  return 117;
+  return 0;
 }
 
 function setCachedCloudCount(val: number): void {
@@ -659,18 +536,42 @@ function setCachedCloudToday(val: number): void {
   setCachedCloudDailyValue(getKstDateString(), val);
 }
 
+function loadPersistedRealLedger(): PersistentAnalyticsLedger {
+  const empty = createEmptyRealLedger("real");
+  if (typeof window === "undefined") return empty;
+  try {
+    const raw = localStorage.getItem(LEDGER_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as PersistentAnalyticsLedger;
+      if (parsed && parsed.trackingMode === "real") {
+        const dates = getDatesLastNDays(14);
+        if (!parsed.dailyStats) parsed.dailyStats = {};
+        dates.forEach((d) => {
+          if (typeof parsed.dailyStats[d] !== "number") {
+            parsed.dailyStats[d] = 0;
+          }
+        });
+        if (!parsed.activeSessions) parsed.activeSessions = {};
+        if (!parsed.sessionDurations) parsed.sessionDurations = {};
+        if (!parsed.uniqueSessionIds) parsed.uniqueSessionIds = {};
+        return parsed;
+      }
+    }
+  } catch {}
+  return empty;
+}
+
 /**
- * Deterministic Calendar-Anchored Cloud-Synced Ledger Builder:
- * - Pre-2026-11-17 dates use fixed calendar keys (never shift or decrease when tomorrow comes).
- * - From 2026-11-17 onward, every date uses its exact Abacus Cloud Counter (day_YYYY-MM-DD)
- *   so today's count stays frozen permanently on its date after midnight rollover.
+ * Real Cloud-Synced Ledger Builder:
+ * - Preserves 100% genuine local/session visits (countries, referrers, languages, pages, devices, active sessions, stay seconds).
+ * - Merges Abacus Cloud `global_visits` & per-day `day_YYYY-MM-DD` counts cleanly without inventing fake visitor logs or floors.
  */
-export function buildGlobalSyncedCampaignLedger(
+export function buildRealCloudSyncedLedger(
   cloudTotalOverride?: number,
   cloudTodayOverride?: number,
   dailyMapOverride?: Record<string, number>
 ): PersistentAnalyticsLedger {
-  const ledger = createCampaignLedger();
+  const ledger = loadPersistedRealLedger();
   const cloudTotal = typeof cloudTotalOverride === "number" ? cloudTotalOverride : getCachedCloudCount();
   const cloudDailyMap = { ...getCachedCloudDailyMap(), ...(dailyMapOverride || {}) };
   const today = getKstDateString();
@@ -678,134 +579,48 @@ export function buildGlobalSyncedCampaignLedger(
     cloudDailyMap[today] = cloudTodayOverride;
   }
 
-  const now = Date.now();
   const dates = getDatesLastNDays(14);
-
-  // Add the pre-Nov-17 cloud base (115 visits) into totalVisits without overwriting fixed calendar bars
-  const historicalCloudBase = Math.min(cloudTotal, HISTORICAL_CLOUD_BASE_THROUGH_NOV16);
-  for (let i = 0; i < historicalCloudBase; i++) {
-    const profile = GLOBAL_STREAM_PROFILES[i % GLOBAL_STREAM_PROFILES.length];
-    ledger.totalVisits += 1;
-    ledger.uniqueVisitorsCount = (ledger.uniqueVisitorsCount || 0) + (ledger.totalVisits % 4 !== 0 ? 1 : 0);
-    const cKey = profile.country.code;
-    ledger.countryStats[cKey] = ledger.countryStats[cKey]
-      ? { ...ledger.countryStats[cKey], count: ledger.countryStats[cKey].count + 1 }
-      : { ...profile.country, count: 1 };
-    const langKey = profile.lang;
-    ledger.languageStats[langKey] = ledger.languageStats[langKey]
-      ? { ...ledger.languageStats[langKey], count: ledger.languageStats[langKey].count + 1 }
-      : { code: langKey, name: LANGUAGE_LABELS[langKey] || langKey, count: 1 };
-    const pKey = profile.page;
-    ledger.pageStats[pKey] = ledger.pageStats[pKey]
-      ? { ...ledger.pageStats[pKey], count: ledger.pageStats[pKey].count + 1 }
-      : { path: pKey, name: PAGE_LABELS[pKey] || pKey, count: 1 };
-    const dKey = profile.device;
-    ledger.deviceStats[dKey] = ledger.deviceStats[dKey]
-      ? { ...ledger.deviceStats[dKey], count: ledger.deviceStats[dKey].count + 1 }
-      : { name: DEVICE_LABELS[dKey] || dKey, count: 1 };
-    const refKey = profile.refKey;
-    ledger.referrerStats[refKey] = ledger.referrerStats[refKey]
-      ? { ...ledger.referrerStats[refKey], count: ledger.referrerStats[refKey].count + 1 }
-      : { name: profile.refLabel, count: 1 };
-  }
-
-  // Apply real per-day cloud visits for every date >= 2026-11-17 (past days + today)
-  let summedRealDailySinceNov17 = 0;
   dates.forEach((dateStr) => {
     if (dateStr >= REAL_CLOUD_DAILY_START_DATE) {
-      const dayVal = typeof cloudDailyMap[dateStr] === "number" ? cloudDailyMap[dateStr] : 0;
-      ledger.dailyStats[dateStr] = dayVal;
-      summedRealDailySinceNov17 += dayVal;
-
-      for (let i = 0; i < dayVal; i++) {
-        const profile = GLOBAL_STREAM_PROFILES[(historicalCloudBase + i) % GLOBAL_STREAM_PROFILES.length];
-        const visitTimeMs = dateStr === today ? now - (dayVal - i) * 45000 : new Date(`${dateStr}T12:00:00+09:00`).getTime() + i * 60000;
-        // Increment demographic breakdowns without double-adding dailyStats (already set directly to dayVal)
-        ledger.totalVisits += 1;
-        ledger.uniqueVisitorsCount = (ledger.uniqueVisitorsCount || 0) + (ledger.totalVisits % 4 !== 0 ? 1 : 0);
-
-        const cKey = profile.country.code;
-        ledger.countryStats[cKey] = ledger.countryStats[cKey]
-          ? { ...ledger.countryStats[cKey], count: ledger.countryStats[cKey].count + 1 }
-          : { ...profile.country, count: 1 };
-        const langKey = profile.lang;
-        ledger.languageStats[langKey] = ledger.languageStats[langKey]
-          ? { ...ledger.languageStats[langKey], count: ledger.languageStats[langKey].count + 1 }
-          : { code: langKey, name: LANGUAGE_LABELS[langKey] || langKey, count: 1 };
-        const pKey = profile.page;
-        ledger.pageStats[pKey] = ledger.pageStats[pKey]
-          ? { ...ledger.pageStats[pKey], count: ledger.pageStats[pKey].count + 1 }
-          : { path: pKey, name: PAGE_LABELS[pKey] || pKey, count: 1 };
-        const dKey = profile.device;
-        ledger.deviceStats[dKey] = ledger.deviceStats[dKey]
-          ? { ...ledger.deviceStats[dKey], count: ledger.deviceStats[dKey].count + 1 }
-          : { name: DEVICE_LABELS[dKey] || dKey, count: 1 };
-        const refKey = profile.refKey;
-        ledger.referrerStats[refKey] = ledger.referrerStats[refKey]
-          ? { ...ledger.referrerStats[refKey], count: ledger.referrerStats[refKey].count + 1 }
-          : { name: profile.refLabel, count: 1 };
-
-        if (dateStr === today) {
-          ledger.recentVisitors.unshift({
-            id: "v_glb_" + visitTimeMs + "_" + ledger.totalVisits,
-            timestamp: new Date(visitTimeMs).toISOString(),
-            country: profile.country.name,
-            flag: profile.country.flag,
-            code: profile.country.code,
-            path: pKey,
-            device: dKey,
-            language: langKey,
-            referrer: profile.refLabel,
-          });
-          if (ledger.recentVisitors.length > 50) {
-            ledger.recentVisitors = ledger.recentVisitors.slice(0, 50);
-          }
-        }
-      }
+      const cloudDayVal = typeof cloudDailyMap[dateStr] === "number" ? cloudDailyMap[dateStr] : 0;
+      ledger.dailyStats[dateStr] = Math.max(ledger.dailyStats[dateStr] || 0, cloudDayVal);
     }
   });
 
-  // Ensure totalVisits reflects global cloud_visits delta even if older >14d visits accrued
-  const expectedTotalFromCloud = HISTORICAL_CAMPAIGN_TOTAL_BASE + cloudTotal;
-  if (ledger.totalVisits < expectedTotalFromCloud) {
-    ledger.totalVisits = expectedTotalFromCloud;
-    ledger.uniqueVisitorsCount = Math.round(ledger.totalVisits * 0.82);
-  }
-
+  const localTotal = ledger.localVisitsCount ?? 0;
+  const todayVal = ledger.dailyStats[today] || 0;
+  ledger.todayDate = today;
+  ledger.totalVisits = Math.max(cloudTotal, localTotal, ledger.totalVisits || 0, todayVal);
+  ledger.uniqueVisitorsCount = Object.keys(ledger.uniqueSessionIds || {}).length;
   ledger.lastSyncedCloudTotal = cloudTotal;
-  ledger.lastUpdated = now;
-  ledger.lastAutoCatchupTime = now;
+  ledger.lastUpdated = Date.now();
   return ledger;
 }
 
+// Keep export alias for compatibility
+export const buildGlobalSyncedCampaignLedger = buildRealCloudSyncedLedger;
+
 export const ZERO_FALLBACK_STATS: AnalyticsStatsResponse = computeStatsFromLedger(createZeroLedger());
 export const SEED_FALLBACK_STATS: AnalyticsStatsResponse = computeStatsFromLedger(createSeedLedger());
-export const DEFAULT_FALLBACK_STATS: AnalyticsStatsResponse = computeStatsFromLedger(buildGlobalSyncedCampaignLedger(3));
+export const DEFAULT_FALLBACK_STATS: AnalyticsStatsResponse = computeStatsFromLedger(createEmptyRealLedger("real"));
 
-function getActiveMode(): "campaign" | "seed" | "zero" {
-  if (typeof window === "undefined") return "campaign";
+function getActiveMode(): "real" | "zero" | "seed" {
+  if (typeof window === "undefined") return "real";
   try {
     const savedMode = localStorage.getItem(ANALYTICS_MODE_KEY);
-    if (savedMode === "zero" || savedMode === "seed" || savedMode === "campaign") {
+    if (savedMode === "zero" || savedMode === "seed" || savedMode === "real") {
       return savedMode;
     }
   } catch {}
-  return "campaign";
+  return "real";
 }
 
 function getLedger(): PersistentAnalyticsLedger {
-  if (typeof window === "undefined") return buildGlobalSyncedCampaignLedger(3);
+  if (typeof window === "undefined") return createEmptyRealLedger("real");
 
   const mode = getActiveMode();
-
-  // In "campaign" mode (default), ALWAYS build deterministically from Global UTC Clock + Shared Abacus Cloud Counter + High-Water Mark
-  // so that AI Studio preview (*.run.app) and production (corea-labs.com) never reset or drift apart!
-  if (mode === "campaign") {
-    const synced = buildGlobalSyncedCampaignLedger();
-    try {
-      localStorage.setItem(LEDGER_STORAGE_KEY, JSON.stringify(synced));
-    } catch {}
-    return synced;
+  if (mode === "real") {
+    return buildRealCloudSyncedLedger();
   }
 
   try {
@@ -820,6 +635,9 @@ function getLedger(): PersistentAnalyticsLedger {
             parsed.dailyStats[d] = 0;
           }
         });
+        if (!parsed.activeSessions) parsed.activeSessions = {};
+        if (!parsed.sessionDurations) parsed.sessionDurations = {};
+        if (!parsed.uniqueSessionIds) parsed.uniqueSessionIds = {};
         return parsed;
       }
     }
@@ -848,12 +666,23 @@ function broadcastStatsUpdate(stats: AnalyticsStatsResponse) {
 
 function saveLedger(ledger: PersistentAnalyticsLedger): AnalyticsStatsResponse {
   ledger.lastUpdated = Date.now();
+
+  // Prune expired active sessions (> 5 minutes idle)
+  const cutoff = Date.now() - ACTIVE_SESSION_WINDOW_MS;
+  if (ledger.activeSessions) {
+    Object.keys(ledger.activeSessions).forEach((sid) => {
+      if (ledger.activeSessions[sid] < cutoff) {
+        delete ledger.activeSessions[sid];
+      }
+    });
+  }
+
   const computed = computeStatsFromLedger(ledger);
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem(LEDGER_STORAGE_KEY, JSON.stringify(ledger));
       localStorage.setItem(ANALYTICS_CACHE_KEY, JSON.stringify(computed));
-      localStorage.setItem(ANALYTICS_MODE_KEY, ledger.trackingMode || "campaign");
+      localStorage.setItem(ANALYTICS_MODE_KEY, ledger.trackingMode || "real");
     } catch {}
     broadcastStatsUpdate(computed);
   }
@@ -980,57 +809,111 @@ function recordVisitInBrowserLedger(params: {
   referrerLabel: string;
   timezone: string;
   device: "mobile" | "tablet" | "desktop";
+  isNewSessionVisit: boolean;
 }): AnalyticsStatsResponse {
   const mode = getActiveMode();
-  if (mode === "campaign") {
-    // Increment both total cloud count AND today's KST cloud count synchronously so UI stays consistent
-    const nextCloud = getCachedCloudCount() + 1;
-    const nextToday = getCachedCloudToday() + 1;
-    setCachedCloudCount(nextCloud);
-    setCachedCloudToday(nextToday);
-    const syncedLedger = buildGlobalSyncedCampaignLedger(nextCloud, nextToday);
-    return saveLedger(syncedLedger);
-  }
-
-  const ledger = getLedger();
+  const ledger = mode === "real" ? loadPersistedRealLedger() : getLedger();
   const detectedCountry = resolveCountry(params.timezone, params.language);
-
-  ledger.totalVisits = (ledger.totalVisits || 0) + 1;
-
-  if (!ledger.uniqueSessionIds) ledger.uniqueSessionIds = {};
-  if (params.sessionId && !ledger.uniqueSessionIds[params.sessionId]) {
-    ledger.uniqueSessionIds[params.sessionId] = true;
-    ledger.uniqueVisitorsCount = (ledger.uniqueVisitorsCount || 0) + 1;
-  } else if ((ledger.uniqueVisitorsCount || 0) === 0) {
-    ledger.uniqueVisitorsCount = 1;
-  }
-
   const today = getKstDateString();
   ledger.todayDate = today;
-  if (!ledger.dailyStats) ledger.dailyStats = {};
-  ledger.dailyStats[today] = (ledger.dailyStats[today] || 0) + 1;
 
-  if (!ledger.countryStats) ledger.countryStats = {};
-  const cKey = detectedCountry.code || "US";
-  if (!ledger.countryStats[cKey]) {
-    ledger.countryStats[cKey] = { ...detectedCountry, count: 1 };
-  } else {
-    ledger.countryStats[cKey].count += 1;
-  }
+  if (!ledger.activeSessions) ledger.activeSessions = {};
+  ledger.activeSessions[params.sessionId] = Date.now();
 
-  const langKey = params.language || "en";
-  if (!ledger.languageStats) ledger.languageStats = {};
-  if (!ledger.languageStats[langKey]) {
-    ledger.languageStats[langKey] = {
-      code: langKey,
-      name: LANGUAGE_LABELS[langKey] || langKey,
-      count: 1,
-    };
-  } else {
-    ledger.languageStats[langKey].count += 1;
+  if (!ledger.sessionDurations) ledger.sessionDurations = {};
+  if (typeof ledger.sessionDurations[params.sessionId] !== "number") {
+    ledger.sessionDurations[params.sessionId] = 1;
   }
 
   const pKey = params.path || "home";
+  const langKey = params.language || "en";
+  const dKey = params.device || "desktop";
+  const cKey = detectedCountry.code || "US";
+  const refKey = params.referrerKey || "Direct / corea-labs.com";
+  const refLabel = params.referrerLabel || "직접 접속 (Direct / 북마크)";
+
+  if (params.isNewSessionVisit) {
+    ledger.localVisitsCount = (ledger.localVisitsCount || 0) + 1;
+    ledger.totalVisits = (ledger.totalVisits || 0) + 1;
+
+    if (!ledger.uniqueSessionIds) ledger.uniqueSessionIds = {};
+    if (params.sessionId && !ledger.uniqueSessionIds[params.sessionId]) {
+      ledger.uniqueSessionIds[params.sessionId] = true;
+    }
+    ledger.uniqueVisitorsCount = Object.keys(ledger.uniqueSessionIds).length;
+
+    if (!ledger.dailyStats) ledger.dailyStats = {};
+    ledger.dailyStats[today] = (ledger.dailyStats[today] || 0) + 1;
+
+    if (!ledger.countryStats) ledger.countryStats = {};
+    if (!ledger.countryStats[cKey]) {
+      ledger.countryStats[cKey] = { ...detectedCountry, count: 1 };
+    } else {
+      ledger.countryStats[cKey].count += 1;
+    }
+
+    if (!ledger.languageStats) ledger.languageStats = {};
+    if (!ledger.languageStats[langKey]) {
+      ledger.languageStats[langKey] = {
+        code: langKey,
+        name: LANGUAGE_LABELS[langKey] || langKey,
+        count: 1,
+      };
+    } else {
+      ledger.languageStats[langKey].count += 1;
+    }
+
+    if (!ledger.deviceStats) ledger.deviceStats = {};
+    if (!ledger.deviceStats[dKey]) {
+      ledger.deviceStats[dKey] = {
+        name: DEVICE_LABELS[dKey] || dKey,
+        count: 1,
+      };
+    } else {
+      ledger.deviceStats[dKey].count += 1;
+    }
+
+    if (!ledger.referrerStats) ledger.referrerStats = {};
+    if (!ledger.referrerStats[refKey]) {
+      ledger.referrerStats[refKey] = {
+        name: refLabel,
+        count: 1,
+      };
+    } else {
+      ledger.referrerStats[refKey].count += 1;
+    }
+
+    if (!ledger.recentVisitors) ledger.recentVisitors = [];
+    ledger.recentVisitors.unshift({
+      id: "v_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+      sessionId: params.sessionId,
+      timestamp: new Date().toISOString(),
+      country: detectedCountry.name,
+      flag: detectedCountry.flag,
+      code: detectedCountry.code,
+      path: pKey,
+      device: dKey,
+      language: langKey,
+      referrer: refLabel,
+      staySeconds: ledger.sessionDurations[params.sessionId] || 1,
+    });
+    if (ledger.recentVisitors.length > 50) {
+      ledger.recentVisitors = ledger.recentVisitors.slice(0, 50);
+    }
+  } else {
+    // Same active session switching tab/language: update latest viewed path & active timestamp without double counting visit
+    if (Array.isArray(ledger.recentVisitors)) {
+      const existing = ledger.recentVisitors.find((v) => v.sessionId === params.sessionId);
+      if (existing) {
+        existing.path = pKey;
+        existing.language = langKey;
+        existing.timestamp = new Date().toISOString();
+        existing.staySeconds = ledger.sessionDurations[params.sessionId] || existing.staySeconds;
+      }
+    }
+  }
+
+  // Always record real page view breakdown per tab click
   if (!ledger.pageStats) ledger.pageStats = {};
   if (!ledger.pageStats[pKey]) {
     ledger.pageStats[pKey] = {
@@ -1042,61 +925,22 @@ function recordVisitInBrowserLedger(params: {
     ledger.pageStats[pKey].count += 1;
   }
 
-  const dKey = params.device || "desktop";
-  if (!ledger.deviceStats) ledger.deviceStats = {};
-  if (!ledger.deviceStats[dKey]) {
-    ledger.deviceStats[dKey] = {
-      name: DEVICE_LABELS[dKey] || dKey,
-      count: 1,
-    };
-  } else {
-    ledger.deviceStats[dKey].count += 1;
-  }
-
-  const refKey = params.referrerKey || "Direct / corea-labs.com";
-  const refLabel = params.referrerLabel || "직접 접속 (Direct / 북마크)";
-  if (!ledger.referrerStats) ledger.referrerStats = {};
-  if (!ledger.referrerStats[refKey]) {
-    ledger.referrerStats[refKey] = {
-      name: refLabel,
-      count: 1,
-    };
-  } else {
-    ledger.referrerStats[refKey].count += 1;
-  }
-
-  if (!ledger.recentVisitors) ledger.recentVisitors = [];
-  ledger.recentVisitors.unshift({
-    id: "v_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
-    timestamp: new Date().toISOString(),
-    country: detectedCountry.name,
-    flag: detectedCountry.flag,
-    code: detectedCountry.code,
-    path: pKey,
-    device: dKey,
-    language: langKey,
-    referrer: refLabel,
-  });
-  if (ledger.recentVisitors.length > 50) {
-    ledger.recentVisitors = ledger.recentVisitors.slice(0, 50);
+  if (mode === "real") {
+    const cloudTotal = getCachedCloudCount();
+    const cloudToday = getCachedCloudToday();
+    ledger.dailyStats[today] = Math.max(ledger.dailyStats[today] || 0, cloudToday);
+    ledger.totalVisits = Math.max(ledger.totalVisits, cloudTotal, ledger.dailyStats[today]);
   }
 
   return saveLedger(ledger);
 }
 
-/**
- * Hit the global cross-device cloud counter (Abacus) so visits from any device worldwide are shared.
- */
 function fetchWithTimeout(url: string, timeoutMs: number = 1500): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 
-/**
- * Synchronous 0ms stats reader (Stale-While-Revalidate):
- * Returns the latest cached or computed stats immediately on mount so the UI never waits on network latency.
- */
 export function getAnalyticsStatsSync(): AnalyticsStatsResponse {
   if (typeof window !== "undefined") {
     try {
@@ -1112,9 +956,6 @@ export function getAnalyticsStatsSync(): AnalyticsStatsResponse {
   return computeStatsFromLedger(getLedger());
 }
 
-/**
- * Hit the global cross-device cloud counter (Abacus) so visits from any device worldwide are shared.
- */
 async function hitGlobalCloudCounter(): Promise<{ total: number | null; today: number | null }> {
   try {
     const today = getKstDateString();
@@ -1146,10 +987,6 @@ async function hitGlobalCloudCounter(): Promise<{ total: number | null; today: n
 let lastCloudSyncTime = 0;
 let activeCloudSyncPromise: Promise<void> | null = null;
 
-/**
- * Read the global cross-device cloud counter and synchronize deterministic ledger across all domains.
- * Fetches all recent real dates (>= 2026-11-17) so yesterday/past days never shrink after midnight.
- */
 async function syncWithGlobalCloudCounter(forceNetwork: boolean = false): Promise<void> {
   const now = Date.now();
   if (!forceNetwork && now - lastCloudSyncTime < 10000) {
@@ -1161,6 +998,9 @@ async function syncWithGlobalCloudCounter(forceNetwork: boolean = false): Promis
 
   activeCloudSyncPromise = (async () => {
     try {
+      const mode = getActiveMode();
+      if (mode !== "real") return;
+
       lastCloudSyncTime = Date.now();
       const today = getKstDateString();
       const recentDates = getDatesLastNDays(14).filter((d) => d >= REAL_CLOUD_DAILY_START_DATE);
@@ -1187,33 +1027,12 @@ async function syncWithGlobalCloudCounter(forceNetwork: boolean = false): Promis
         }
       });
 
-      const cloudTodayVal = typeof updatedDailyMap[today] === "number" ? updatedDailyMap[today] : getCachedCloudToday();
-      const prevCloud = getCachedCloudCount();
+      const cloudTodayVal =
+        typeof updatedDailyMap[today] === "number" ? updatedDailyMap[today] : getCachedCloudToday();
       setCachedCloudCount(cloudValue);
 
-      const mode = getActiveMode();
-      if (mode === "campaign") {
-        const syncedLedger = buildGlobalSyncedCampaignLedger(cloudValue, cloudTodayVal, updatedDailyMap);
-        saveLedger(syncedLedger);
-        return;
-      }
-
-      const ledger = getLedger();
-      if (typeof ledger.lastSyncedCloudTotal !== "number") {
-        ledger.lastSyncedCloudTotal = cloudValue;
-        saveLedger(ledger);
-        return;
-      }
-
-      const externalDelta = cloudValue - (ledger.lastSyncedCloudTotal || prevCloud);
-      if (externalDelta > 0 && externalDelta <= 500) {
-        for (let i = 0; i < externalDelta; i++) {
-          const profile = GLOBAL_STREAM_PROFILES[(ledger.totalVisits + i) % GLOBAL_STREAM_PROFILES.length];
-          appendProfileVisitToLedger(ledger, profile);
-        }
-        ledger.lastSyncedCloudTotal = cloudValue;
-        saveLedger(ledger);
-      }
+      const syncedLedger = buildRealCloudSyncedLedger(cloudValue, cloudTodayVal, updatedDailyMap);
+      saveLedger(syncedLedger);
     } catch {}
   })().finally(() => {
     activeCloudSyncPromise = null;
@@ -1234,32 +1053,17 @@ export async function trackPageView(
   try {
     const now = Date.now();
     const trackKey = `${page}:${language}`;
-    if (!force && lastTrackedKey === trackKey && now - lastTrackedTime < 1500) {
+    if (!force && lastTrackedKey === trackKey && now - lastTrackedTime < 1200) {
       return getAnalyticsStatsSync();
     }
     lastTrackedKey = trackKey;
     lastTrackedTime = now;
 
-    // Only increment the global cloud counter once per browser session unless `force === true` (e.g. manual test/boost)
-    const sessionHitKey = "corea_labs_cloud_session_hit_v4";
-    const alreadyHitThisSession = !force && typeof sessionStorage !== "undefined" && sessionStorage.getItem(sessionHitKey) === "1";
-
-    if (!alreadyHitThisSession) {
-      try {
-        if (typeof sessionStorage !== "undefined") {
-          sessionStorage.setItem(sessionHitKey, "1");
-        }
-      } catch {}
-      hitGlobalCloudCounter().then(({ total, today }) => {
-        if (typeof total === "number" && getActiveMode() === "campaign") {
-          saveLedger(buildGlobalSyncedCampaignLedger(total, typeof today === "number" ? today : undefined));
-        }
-      });
-    } else if (getActiveMode() === "campaign") {
-      // Return instant local stats immediately and sync cloud in background (non-blocking!)
-      syncWithGlobalCloudCounter().catch(() => {});
-      return getAnalyticsStatsSync();
-    }
+    const today = getKstDateString();
+    // Scope cloud session hit key to today's KST date so midnight rollover records the new day accurately
+    const sessionHitKey = `corea_labs_cloud_session_hit_${today}`;
+    const alreadyHitToday =
+      !force && typeof sessionStorage !== "undefined" && sessionStorage.getItem(sessionHitKey) === "1";
 
     const sessionId = force
       ? "sess_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6)
@@ -1267,6 +1071,24 @@ export async function trackPageView(
     const device = getDeviceType();
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     const channel = detectCurrentTrafficSource(overrideSource);
+
+    if (!alreadyHitToday) {
+      try {
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.setItem(sessionHitKey, "1");
+        }
+      } catch {}
+
+      if (getActiveMode() === "real") {
+        hitGlobalCloudCounter().then(({ total, today: cloudToday }) => {
+          if (typeof total === "number" && getActiveMode() === "real") {
+            saveLedger(buildRealCloudSyncedLedger(total, typeof cloudToday === "number" ? cloudToday : undefined));
+          }
+        });
+      }
+    } else if (getActiveMode() === "real") {
+      syncWithGlobalCloudCounter().catch(() => {});
+    }
 
     const updatedStats = recordVisitInBrowserLedger({
       sessionId,
@@ -1276,21 +1098,24 @@ export async function trackPageView(
       referrerLabel: channel.label,
       timezone,
       device,
+      isNewSessionVisit: !alreadyHitToday,
     });
 
-    // Fire-and-forget local server log so it never blocks UI rendering
-    fetch(`/api/analytics/track?_t=${now}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sessionId,
-        language,
-        path: page,
-        referrer: channel.key,
-        timezone,
-        device,
-      }),
-    }).catch(() => {});
+    if (!alreadyHitToday) {
+      // Fire-and-forget local server log when Express backend is present (silent no-op on static Cloudflare Pages)
+      fetch(`/api/analytics/track?_t=${now}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          language,
+          path: page,
+          referrer: channel.key,
+          timezone,
+          device,
+        }),
+      }).catch(() => {});
+    }
 
     return updatedStats;
   } catch {
@@ -1298,8 +1123,52 @@ export async function trackPageView(
   }
 }
 
+export function recordSessionHeartbeat(elapsedIncrementSec: number = 5): void {
+  if (typeof window === "undefined") return;
+  const mode = getActiveMode();
+  if (mode === "seed") return;
+
+  try {
+    const sessionId = getSessionId();
+    const ledger = mode === "real" ? loadPersistedRealLedger() : getLedger();
+
+    if (!ledger.activeSessions) ledger.activeSessions = {};
+    ledger.activeSessions[sessionId] = Date.now();
+
+    if (!ledger.sessionDurations) ledger.sessionDurations = {};
+    let currentElapsed = ledger.sessionDurations[sessionId] || 0;
+    try {
+      const savedElapsed = parseInt(sessionStorage.getItem(SESSION_ELAPSED_KEY) || "0", 10);
+      if (!isNaN(savedElapsed) && savedElapsed > currentElapsed) {
+        currentElapsed = savedElapsed;
+      }
+    } catch {}
+
+    const nextElapsed = currentElapsed + Math.max(0, elapsedIncrementSec);
+    ledger.sessionDurations[sessionId] = nextElapsed;
+    try {
+      sessionStorage.setItem(SESSION_ELAPSED_KEY, String(nextElapsed));
+    } catch {}
+
+    if (Array.isArray(ledger.recentVisitors)) {
+      const entry = ledger.recentVisitors.find((v) => v.sessionId === sessionId);
+      if (entry) {
+        entry.staySeconds = nextElapsed;
+        entry.timestamp = new Date().toISOString();
+      }
+    }
+
+    saveLedger(ledger);
+
+    fetch("/api/analytics/heartbeat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, staySeconds: nextElapsed }),
+    }).catch(() => {});
+  } catch {}
+}
+
 export async function fetchAnalyticsStats(forceNetwork: boolean = false): Promise<AnalyticsStatsResponse> {
-  // Trigger cloud sync in background or await up to 1.5s max if explicitly forced
   if (forceNetwork) {
     await syncWithGlobalCloudCounter(true);
   } else {
@@ -1309,27 +1178,38 @@ export async function fetchAnalyticsStats(forceNetwork: boolean = false): Promis
   return saveLedger(localLedger);
 }
 
-export async function resetAnalyticsData(mode: "zero" | "seed" | "campaign" = "campaign"): Promise<boolean> {
+export async function resetAnalyticsData(mode: "real" | "zero" | "seed" | "campaign" = "real"): Promise<boolean> {
   try {
+    const normalizedMode: "real" | "zero" | "seed" =
+      mode === "seed" ? "seed" : mode === "zero" ? "zero" : "real";
+
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem(ANALYTICS_MODE_KEY, mode);
+        localStorage.setItem(ANALYTICS_MODE_KEY, normalizedMode);
+        if (normalizedMode === "zero") {
+          sessionStorage.removeItem(SESSION_ELAPSED_KEY);
+          const today = getKstDateString();
+          sessionStorage.removeItem(`corea_labs_cloud_session_hit_${today}`);
+        }
       } catch {}
     }
 
     const nextLedger =
-      mode === "seed"
+      normalizedMode === "seed"
         ? createSeedLedger()
-        : mode === "zero"
+        : normalizedMode === "zero"
         ? createZeroLedger()
-        : buildGlobalSyncedCampaignLedger();
+        : createEmptyRealLedger("real");
 
     lastTrackedKey = "";
     lastTrackedTime = 0;
 
     saveLedger(nextLedger);
 
-    if (mode === "zero") {
+    if (normalizedMode === "real") {
+      await syncWithGlobalCloudCounter(true);
+      await trackPageView("home", "ko", true);
+    } else if (normalizedMode === "zero") {
       await trackPageView("home", "ko", true);
     }
 
@@ -1337,7 +1217,7 @@ export async function resetAnalyticsData(mode: "zero" | "seed" | "campaign" = "c
       await fetch(`/api/analytics/reset?_t=${Date.now()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify({ mode: normalizedMode }),
       });
     } catch {}
 
@@ -1349,86 +1229,57 @@ export async function resetAnalyticsData(mode: "zero" | "seed" | "campaign" = "c
 }
 
 /**
- * Trigger global search engine IndexNow / Sitemap pings and increment the shared Abacus Cloud Counter (+5)
- * so both AI Studio and corea-labs.com increase by the exact same 5 visits.
+ * Trigger real search engine IndexNow / WebSub sitemap pings WITHOUT inflating visitor counts.
  */
 export async function triggerGlobalSeoPingAndBoost(): Promise<AnalyticsStatsResponse> {
-  const mode = getActiveMode();
-  let latestCloud = getCachedCloudCount() + 5;
-  let latestToday = getCachedCloudToday() + 5;
-  setCachedCloudCount(latestCloud);
-  setCachedCloudToday(latestToday);
-
-  // Fire 5 real hits to the global Abacus Cloud Counter so all devices/domains receive the exact +5 increase
   try {
-    const results = await Promise.all([
-      hitGlobalCloudCounter(),
-      hitGlobalCloudCounter(),
-      hitGlobalCloudCounter(),
-      hitGlobalCloudCounter(),
-      hitGlobalCloudCounter(),
-    ]);
-    const validTotals = results.map((r) => r.total).filter((v): v is number => typeof v === "number");
-    const validTodays = results.map((r) => r.today).filter((v): v is number => typeof v === "number");
-    if (validTotals.length > 0) {
-      latestCloud = Math.max(...validTotals);
-      setCachedCloudCount(latestCloud);
-    }
-    if (validTodays.length > 0) {
-      latestToday = Math.max(...validTodays);
-      setCachedCloudToday(latestToday);
-    }
+    await fetch("/api/promote/ping", { method: "POST" }).catch(() => null);
   } catch {}
-
-  if (mode === "campaign") {
-    const synced = buildGlobalSyncedCampaignLedger(latestCloud, latestToday);
-    return saveLedger(synced);
-  }
-
-  const ledger = getLedger();
-  const boostProfiles = [
-    GLOBAL_STREAM_PROFILES[0],
-    GLOBAL_STREAM_PROFILES[1],
-    GLOBAL_STREAM_PROFILES[2],
-    GLOBAL_STREAM_PROFILES[4],
-    GLOBAL_STREAM_PROFILES[5],
-  ];
-
-  for (const prof of boostProfiles) {
-    appendProfileVisitToLedger(ledger, prof);
-  }
-
-  return saveLedger(ledger);
+  return fetchAnalyticsStats(true);
 }
 
-/**
- * Background Global Campaign Stream:
- * Periodically re-evaluates the deterministic UTC clock + Abacus Cloud Counter every 15 seconds
- * so all open tabs across AI Studio (*.run.app) and https://corea-labs.com stay 100% identical in real time.
- */
 let globalStreamInterval: number | null = null;
+let heartbeatInterval: number | null = null;
 
 export function startGlobalCampaignStream(): () => void {
   if (typeof window === "undefined") return () => {};
-  if (globalStreamInterval !== null) {
-    window.clearInterval(globalStreamInterval);
-  }
+  if (globalStreamInterval !== null) window.clearInterval(globalStreamInterval);
+  if (heartbeatInterval !== null) window.clearInterval(heartbeatInterval);
 
   // Initial cloud sync on mount
   syncWithGlobalCloudCounter().catch(() => {});
 
-  // Poll the shared cloud counter every 30 seconds to reflect real cross-device visitors (no fake auto-increment)
+  // Poll cloud counter every 30 seconds for real cross-device visitors
   globalStreamInterval = window.setInterval(() => {
     const mode = getActiveMode();
-    if (mode === "zero") return;
+    if (mode !== "real") return;
     syncWithGlobalCloudCounter().catch(() => {});
   }, 30000);
+
+  // Accumulate real dwell time every 5 seconds while tab is visible
+  heartbeatInterval = window.setInterval(() => {
+    if (document.visibilityState === "visible") {
+      recordSessionHeartbeat(5);
+    }
+  }, 5000);
+
+  const handleVisibility = () => {
+    if (document.visibilityState === "visible") {
+      recordSessionHeartbeat(1);
+    }
+  };
+  document.addEventListener("visibilitychange", handleVisibility);
 
   return () => {
     if (globalStreamInterval !== null) {
       window.clearInterval(globalStreamInterval);
       globalStreamInterval = null;
     }
+    if (heartbeatInterval !== null) {
+      window.clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
+    }
+    document.removeEventListener("visibilitychange", handleVisibility);
   };
 }
 
@@ -1477,4 +1328,3 @@ export function subscribeToAnalyticsUpdates(callback: (stats: AnalyticsStatsResp
     }
   };
 }
-
